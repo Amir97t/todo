@@ -1,6 +1,6 @@
 import Button from "../ui/Button";
 
-export default function FilterBar({ filter, onChange }) {
+export default function FilterBar({ onChange }) {
   return (
     <div className="flex gap-3">
       <Button onClick={() => onChange("all")}>All</Button>
