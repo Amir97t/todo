@@ -12,6 +12,7 @@ export default function App() {
       title,
       description,
       completed: false,
+      createdAt: Date.now(),
     };
     setTasks((prev) => [...prev, newTask]);
   }
