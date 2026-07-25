@@ -1,23 +1,50 @@
+import { useState } from "react";
 import AddTaskCard from "../components/task/AddTaskCard";
 import TaskList from "../components/task/TaskList";
 import Navbar from "../components/layout/Navbar";
+import useTaskFilter from "../hooks/useTaskFilter";
+import SearchBar from "../components/task/SearchBar";
+import TaskCounter from "../components/task/TaskCounter";
+import FilterBar from "../components/task/FIlterBar";
 
 export default function Home({ tasks, taskActions }) {
   const { addTask, deleteTask, toggleTask } = taskActions;
-  const activeTasks = tasks.filter((task) => !task.completed); //needs a refactor
+
+  const [search, setSearch] = useState("");
+  const [filter, setFilter] = useState("newest");
+  const activeTasks = useTaskFilter({
+    tasks,
+    search,
+    filter,
+    completed: false,
+  });
 
   return (
-    <main className="min-h-screen bg-zinc-950 text-white p-8">
+    <main className="min-h-screen bg-zinc-950 p-8 text-white">
       <div className="mx-auto max-w-4xl">
-        <h1 className="mb-8 text-center text-4xl font-bold">Todo List</h1>
         <Navbar />
+
+        <h1 className="mb-2 text-center text-4xl font-bold">Todo List</h1>
+        <p className="mb-8 text-center text-zinc-400">
+          Focus on your active tasks.
+        </p>
+
         <AddTaskCard onAddTask={addTask} />
-        <TaskList
-          title="Active Tasks"
-          tasks={activeTasks}
-          onDelete={deleteTask}
-          onToggle={toggleTask}
-        />
+
+        <div className="mt-8">
+          <SearchBar value={search} onChange={setSearch} />
+          <div className="mb-4 flex items-center justify-between gap-4">
+            <TaskCounter total={activeTasks.length} />
+            <FilterBar filter={filter} onChange={setFilter} />
+          </div>
+
+          <TaskList
+            title="Active Tasks"
+            tasks={activeTasks}
+            onDelete={deleteTask}
+            onToggle={toggleTask}
+          />
+        </div>
       </div>
     </main>
   );
