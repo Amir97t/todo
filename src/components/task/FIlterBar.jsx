@@ -1,22 +1,24 @@
 export default function FilterBar({ filter, onChange }) {
-  const btn = (value, label) => (
-    <button
-      onClick={() => onChange(value)}
-      className={`rounded-lg px-4 py-2 transition
-            ${
-              filter === value
-                ? "bg-red-600 text-white"
-                : "bg-zinc-800 text-zinc-300 hover:bg-zinc-700"
-            }`}
-    >
-      {label}
-    </button>
-  );
+  const options = [
+    { value: "newest", label: "Newest" },
+    { value: "oldest", label: "Oldest" },
+  ];
+
   return (
-    <div className="mb-6 flex gap-3">
-      {btn("all", "All")}
-      {btn("newest", "Newest")}
-      {btn("oldest", "Oldest")}
+    <div className="flex gap-3">
+      {options.map((option) => (
+        <button
+          key={option.value}
+          onClick={() => onChange(option.value)}
+          className={`rounded-lg px-4 py-2 text-sm font-medium transition ${
+            filter === option.value
+              ? "bg-red-600 text-white"
+              : "bg-zinc-800 text-zinc-300 hover:bg-zinc-700"
+          }`}
+        >
+          {option.label}
+        </button>
+      ))}
     </div>
   );
 }

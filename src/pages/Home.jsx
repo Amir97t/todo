@@ -34,7 +34,7 @@ export default function Home({ tasks, taskActions }) {
         <div className="mt-8">
           <SearchBar value={search} onChange={setSearch} />
           <div className="mb-4 flex items-center justify-between gap-4">
-            <TaskCounter total={activeTasks.length} />
+            <TaskCounter total={activeTasks.length} label="Active" />
             <FilterBar filter={filter} onChange={setFilter} />
           </div>
 

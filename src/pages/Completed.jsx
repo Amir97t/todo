@@ -32,7 +32,7 @@ export default function Completed({ tasks, taskActions }) {
         <SearchBar value={search} onChange={setSearch} />
 
         <div className="mb-4 flex items-center justify-between gap-4">
-          <TaskCounter total={completedTasks.length} />
+          <TaskCounter total={completedTasks.length} label="Completed" />
           <FilterBar filter={filter} onChange={setFilter} />
         </div>
 

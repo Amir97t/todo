@@ -1,9 +1,7 @@
-export default function TaskCounter({ total, active, completed }) {
+export default function TaskCounter({ total, label = "Tasks" }) {
   return (
-    <div className="flex gap-6 text-zinc-400">
-      <span>Total: {total}</span>
-      <span>Active: {active}</span>
-      <span>Completed: {completed}</span>
+    <div className="text-sm text-zinc-400">
+      {total} {label}
     </div>
   );
 }
