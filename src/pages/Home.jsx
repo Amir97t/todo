@@ -9,7 +9,7 @@ import FilterBar from "../components/task/FIlterBar";
 import EmptyState from "../components/common/EmptyState";
 
 export default function Home({ tasks, taskActions }) {
-  const { addTask, deleteTask, toggleTask } = taskActions;
+  const { addTask} = taskActions;
 
   const [search, setSearch] = useState("");
   const [filter, setFilter] = useState("newest");
@@ -54,8 +54,7 @@ export default function Home({ tasks, taskActions }) {
             <TaskList
               title="Active Tasks"
               tasks={activeTasks}
-              onDelete={deleteTask}
-              onToggle={toggleTask}
+              taskActions={taskActions}
             />
           )}
         </div>

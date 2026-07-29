@@ -8,8 +8,6 @@ import useTaskFilter from "../hooks/useTaskFilter";
 import EmptyState from "../components/common/EmptyState";
 
 export default function Completed({ tasks, taskActions }) {
-  const { deleteTask, toggleTask } = taskActions;
-
   const [search, setSearch] = useState("");
   const [filter, setFilter] = useState("newest");
 
@@ -53,8 +51,7 @@ export default function Completed({ tasks, taskActions }) {
           <TaskList
             title="Completed Tasks"
             tasks={completedTasks}
-            onDelete={deleteTask}
-            onToggle={toggleTask}
+            taskActions={taskActions}
           />
         )}
       </div>

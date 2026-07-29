@@ -1,37 +1,19 @@
 import TaskItem from "./TaskItem";
 
-export default function TaskList({
-  title,
-  tasks,
-  onDelete,
-  onToggle,
-}) {
+export default function TaskList({ title, tasks, taskActions }) {
   return (
     <section className="mt-10">
-
-      <h2 className="mb-5 text-2xl font-bold">
-        {title}
-      </h2>
+      <h2 className="mb-5 text-2xl font-bold">{title}</h2>
 
       <div className="space-y-4">
-
         {tasks.length === 0 ? (
-          <p className="text-zinc-500">
-            No tasks.
-          </p>
+          <p className="text-zinc-500">No tasks.</p>
         ) : (
           tasks.map((task) => (
-            <TaskItem
-              key={task.id}
-              task={task}
-              onDelete={onDelete}
-              onToggle={onToggle}
-            />
+            <TaskItem key={task.id} task={task} taskActions={taskActions} />
           ))
         )}
-
       </div>
-
     </section>
   );
 }
