@@ -5,6 +5,7 @@ import FilterBar from "../components/task/FilterBar";
 import TaskCounter from "../components/task/TaskCounter";
 import TaskList from "../components/task/TaskList";
 import useTaskFilter from "../hooks/useTaskFilter";
+import EmptyState from "../components/common/EmptyState";
 
 export default function Completed({ tasks, taskActions }) {
   const { deleteTask, toggleTask } = taskActions;
@@ -18,6 +19,8 @@ export default function Completed({ tasks, taskActions }) {
     filter,
     completed: true,
   });
+
+  const hasCompletedTasks = tasks.some((task) => task.completed);
 
   return (
     <main className="min-h-screen bg-zinc-950 p-8 text-white">
@@ -35,13 +38,25 @@ export default function Completed({ tasks, taskActions }) {
           <TaskCounter total={completedTasks.length} label="Completed" />
           <FilterBar filter={filter} onChange={setFilter} />
         </div>
-
-        <TaskList
-          title="Completed Tasks"
-          tasks={completedTasks}
-          onDelete={deleteTask}
-          onToggle={toggleTask}
-        />
+        {completedTasks.length === 0 ? (
+          <EmptyState
+            title={
+              hasCompletedTasks ? "No matching tasks" : "No completed tasks"
+            }
+            description={
+              hasCompletedTasks
+                ? "Try another search keyword."
+                : "Complete a task to see it here."
+            }
+          />
+        ) : (
+          <TaskList
+            title="Completed Tasks"
+            tasks={completedTasks}
+            onDelete={deleteTask}
+            onToggle={toggleTask}
+          />
+        )}
       </div>
     </main>
   );

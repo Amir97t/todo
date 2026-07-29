@@ -6,6 +6,7 @@ import useTaskFilter from "../hooks/useTaskFilter";
 import SearchBar from "../components/task/SearchBar";
 import TaskCounter from "../components/task/TaskCounter";
 import FilterBar from "../components/task/FIlterBar";
+import EmptyState from "../components/common/EmptyState";
 
 export default function Home({ tasks, taskActions }) {
   const { addTask, deleteTask, toggleTask } = taskActions;
@@ -18,6 +19,8 @@ export default function Home({ tasks, taskActions }) {
     filter,
     completed: false,
   });
+
+  const hasActiveTasks = tasks.some((task) => !task.completed);
 
   return (
     <main className="min-h-screen bg-zinc-950 p-8 text-white">
@@ -38,12 +41,23 @@ export default function Home({ tasks, taskActions }) {
             <FilterBar filter={filter} onChange={setFilter} />
           </div>
 
-          <TaskList
-            title="Active Tasks"
-            tasks={activeTasks}
-            onDelete={deleteTask}
-            onToggle={toggleTask}
-          />
+          {activeTasks.length === 0 ? (
+            <EmptyState
+              title={hasActiveTasks ? "No matching tasks" : "No active tasks"}
+              description={
+                hasActiveTasks
+                  ? "Try another search keyword."
+                  : "Create your first task."
+              }
+            />
+          ) : (
+            <TaskList
+              title="Active Tasks"
+              tasks={activeTasks}
+              onDelete={deleteTask}
+              onToggle={toggleTask}
+            />
+          )}
         </div>
       </div>
     </main>
