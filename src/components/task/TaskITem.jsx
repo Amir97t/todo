@@ -1,8 +1,22 @@
 import Button from "../ui/Button";
 import { Card } from "../ui/Card";
 
-export default function TaskItem({ task, taskActions }) {
+export default function TaskItem({
+  task,
+  taskActions,
+  editingId,
+  onStartEdit,
+}) {
   const { deleteTask, toggleTask } = taskActions;
+
+  const isEditing = editingId === task.id;
+  console.log(task.title, isEditing);
+
+ function handleStartEdit() {
+  console.log("Edit clicked", task.id);
+
+  onStartEdit(task.id);
+}
 
   return (
     <Card className="flex items-center justify-between p-5">
@@ -14,7 +28,9 @@ export default function TaskItem({ task, taskActions }) {
         />
 
         <div>
-          <h3 className="font-semibold">{task.title}</h3>
+          <h3 className="font-semibold">
+            {isEditing ? "Editing..." : task.title}
+          </h3>
 
           <p className="text-sm text-zinc-400">{task.description}</p>
         </div>
@@ -26,6 +42,7 @@ export default function TaskItem({ task, taskActions }) {
       >
         Delete
       </Button>
+      <Button onClick={handleStartEdit}>Edit</Button>
     </Card>
   );
 }

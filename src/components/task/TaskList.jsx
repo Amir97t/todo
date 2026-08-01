@@ -1,6 +1,12 @@
 import TaskItem from "./TaskItem";
 
-export default function TaskList({ title, tasks, taskActions }) {
+export default function TaskList({
+  title,
+  tasks,
+  taskActions,
+  editingId,
+  onStartEdit,
+}) {
   return (
     <section className="mt-10">
       <h2 className="mb-5 text-2xl font-bold">{title}</h2>
@@ -10,7 +16,13 @@ export default function TaskList({ title, tasks, taskActions }) {
           <p className="text-zinc-500">No tasks.</p>
         ) : (
           tasks.map((task) => (
-            <TaskItem key={task.id} task={task} taskActions={taskActions} />
+            <TaskItem
+              key={task.id}
+              task={task}
+              taskActions={taskActions}
+              editingId={editingId}
+              onStartEdit={onStartEdit}
+            />
           ))
         )}
       </div>

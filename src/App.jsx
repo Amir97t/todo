@@ -38,11 +38,25 @@ export default function App() {
     );
   }
 
+  function editTask(id, updatedTask) {
+    setTasks((prev) =>
+      prev.map((task) =>
+        task.id === id
+          ? {
+              ...task,
+              ...updatedTask,
+            }
+          : task,
+      ),
+    );
+  }
+
   const taskActions = useMemo(
     () => ({
       addTask,
       deleteTask,
       toggleTask,
+      editTask,
     }),
     [],
   );

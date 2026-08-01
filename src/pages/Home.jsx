@@ -9,7 +9,9 @@ import FilterBar from "../components/task/FIlterBar";
 import EmptyState from "../components/common/EmptyState";
 
 export default function Home({ tasks, taskActions }) {
-  const { addTask} = taskActions;
+  const [editingId, setEditingId] = useState(null);
+  console.log("editingId:", editingId);
+  const { addTask } = taskActions;
 
   const [search, setSearch] = useState("");
   const [filter, setFilter] = useState("newest");
@@ -55,6 +57,8 @@ export default function Home({ tasks, taskActions }) {
               title="Active Tasks"
               tasks={activeTasks}
               taskActions={taskActions}
+              editingId={editingId}
+              onStartEdit={setEditingId}
             />
           )}
         </div>
