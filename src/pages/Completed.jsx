@@ -10,7 +10,7 @@ import EmptyState from "../components/common/EmptyState";
 export default function Completed({ tasks, taskActions }) {
   const [search, setSearch] = useState("");
   const [filter, setFilter] = useState("newest");
-
+  const [editingId, setEditingId] = useState(null);
   const completedTasks = useTaskFilter({
     tasks,
     search,
@@ -52,6 +52,8 @@ export default function Completed({ tasks, taskActions }) {
             title="Completed Tasks"
             tasks={completedTasks}
             taskActions={taskActions}
+            editingId={editingId}
+            onStartEdit={setEditingId}
           />
         )}
       </div>
