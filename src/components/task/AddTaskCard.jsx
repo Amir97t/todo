@@ -13,12 +13,12 @@ import {
   CardFooter,
 } from "../ui/Card";
 
-export default function AddTaskCard({ onAddTask }) {
+export default function AddTaskCard({ onAddTask, selectedListId }) {
   const [title, setTitle] = useState("");
   const [description, setDescription] = useState("");
 
   function handleSubmit() {
-    onAddTask(title, description);
+    onAddTask(title, description, selectedListId);
 
     setTitle("");
     setDescription("");
@@ -26,19 +26,13 @@ export default function AddTaskCard({ onAddTask }) {
 
   return (
     <Card className="mb-8">
-
       <CardHeader>
-
         <CardTitle>Add Task</CardTitle>
 
-        <CardDescription>
-          Add a new task.
-        </CardDescription>
-
+        <CardDescription>Add a new task.</CardDescription>
       </CardHeader>
 
       <CardContent className="space-y-4">
-
         <Input
           placeholder="Task title..."
           value={title}
@@ -50,17 +44,11 @@ export default function AddTaskCard({ onAddTask }) {
           value={description}
           onChange={(e) => setDescription(e.target.value)}
         />
-
       </CardContent>
 
       <CardFooter>
-
-        <Button onClick={handleSubmit}>
-          Add Task
-        </Button>
-
+        <Button onClick={handleSubmit}>Add Task</Button>
       </CardFooter>
-
     </Card>
   );
 }

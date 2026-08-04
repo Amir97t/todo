@@ -4,6 +4,13 @@ import Router from "./routes/Router";
 const STORAGE_KEY = "todo-app-tasks";
 
 export default function App() {
+  const [lists, setLists] = useState([
+    {
+      id: "inbox",
+      name: "Inbox",
+    },
+  ]);
+  const [selectedListId, setSelectedListId] = useState("inbox");
   const [tasks, setTasks] = useState(() => {
     const saved = localStorage.getItem(STORAGE_KEY);
     return saved ? JSON.parse(saved) : [];
@@ -13,13 +20,14 @@ export default function App() {
     localStorage.setItem(STORAGE_KEY, JSON.stringify(tasks));
   }, [tasks]);
 
-  function addTask(title, description) {
+  function addTask(title, description, listId) {
     if (!title.trim()) return;
 
     const newTask = {
       id: crypto.randomUUID(),
       title,
       description,
+      listId,
       completed: false,
       createdAt: Date.now(),
     };
@@ -61,5 +69,13 @@ export default function App() {
     [],
   );
 
-  return <Router tasks={tasks} taskActions={taskActions} />;
+  return (
+    <Router
+      tasks={tasks}
+      lists={lists}
+      selectedListId={selectedListId}
+      setSelectedListId={setSelectedListId}
+      taskActions={taskActions}
+    />
+  );
 }

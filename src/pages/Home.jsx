@@ -8,7 +8,13 @@ import TaskCounter from "../components/task/TaskCounter";
 import FilterBar from "../components/task/FIlterBar";
 import EmptyState from "../components/common/EmptyState";
 
-export default function Home({ tasks, taskActions }) {
+export default function Home({
+  tasks,
+  lists,
+  selectedListId,
+  setSelectedListId,
+  taskActions,
+}) {
   const [editingId, setEditingId] = useState(null);
   console.log("editingId:", editingId);
   const { addTask } = taskActions;
@@ -17,9 +23,10 @@ export default function Home({ tasks, taskActions }) {
   const [filter, setFilter] = useState("newest");
   const activeTasks = useTaskFilter({
     tasks,
+    completed: false,
+    selectedListId,
     search,
     filter,
-    completed: false,
   });
 
   const hasActiveTasks = tasks.some((task) => !task.completed);
