@@ -15,6 +15,7 @@ export default function Home({
   selectedListId,
   setSelectedListId,
   taskActions,
+  addList,
 }) {
   const [editingId, setEditingId] = useState(null);
   console.log("editingId:", editingId);
@@ -38,6 +39,7 @@ export default function Home({
         lists={lists}
         selectedListId={selectedListId}
         onSelect={setSelectedListId}
+        onAddList={addList}
       />
       <div className="flex-1 p-8">
         <div className="mx-auto max-w-4xl">

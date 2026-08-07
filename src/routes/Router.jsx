@@ -7,10 +7,11 @@ export default function Router({
   lists,
   selectedListId,
   setSelectedListId,
+  addList,
 }) {
   return (
     // <=====
-    <BrowserRouter> 
+    <BrowserRouter>
       <Routes>
         <Route
           path="/"
@@ -34,6 +35,7 @@ export default function Router({
               lists={lists}
               selectedListId={selectedListId}
               setSelectedListId={setSelectedListId}
+              addList={addList}
             />
           }
         />

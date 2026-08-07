@@ -22,9 +22,8 @@ export default function Sidebar({
           />
         ))}
       </div>
-
       <div className="mt-6">
-        <NewListForm onAddList={onAddList} />
+        <NewListForm onSave={onAddList} />
       </div>
     </aside>
   );

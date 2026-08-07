@@ -9,7 +9,7 @@ export default function App() {
     { id: "gym", name: "Gym" },
     { id: "work", name: "Work" },
   ]);
-  
+
   const [selectedListId, setSelectedListId] = useState("inbox");
   const [tasks, setTasks] = useState(() => {
     const saved = localStorage.getItem(STORAGE_KEY);
@@ -37,6 +37,7 @@ export default function App() {
     };
 
     setLists((prev) => [...prev, newList]);
+    setSelectedListId(newList.id);
   }
 
   function addTask(title, description, listId) {
