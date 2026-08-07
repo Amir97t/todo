@@ -46,7 +46,7 @@ export default function Home({
           <p className="mb-8 text-center text-zinc-400">
             Focus on your active tasks.
           </p>
-          <AddTaskCard onAddTask={addTask} />
+          <AddTaskCard onAddTask={addTask} selectedListId={selectedListId} />
           <div className="mt-8">
             <SearchBar value={search} onChange={setSearch} />
             <div className="mb-4 flex items-center justify-between gap-4">

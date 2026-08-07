@@ -4,11 +4,10 @@ import Router from "./routes/Router";
 const STORAGE_KEY = "todo-app-tasks";
 
 export default function App() {
-  const [lists, setLists] = useState([
-    {
-      id: "inbox",
-      name: "Inbox",
-    },
+  const [lists] = useState([
+    { id: "inbox", name: "Inbox" },
+    { id: "gym", name: "Gym" },
+    { id: "work", name: "Work" },
   ]);
   const [selectedListId, setSelectedListId] = useState("inbox");
   const [tasks, setTasks] = useState(() => {
