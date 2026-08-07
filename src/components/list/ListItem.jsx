@@ -1,6 +1,8 @@
 import Button from "../ui/Button";
 
 export default function ListItem({ list, selected, onSelect }) {
+  const isEditing = editingId === list.id;
+
   return (
     <Button
       onClick={() => onSelect(list.id)}

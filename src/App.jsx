@@ -78,6 +78,29 @@ export default function App() {
       ),
     );
   }
+  function renameList(id, name) {
+    const trimmed = name.trim();
+
+    if (!trimmed) return;
+
+    const exists = lists.some(
+      (list) =>
+        list.id !== id && list.name.toLowerCase() === trimmed.toLowerCase(),
+    );
+
+    if (exists) return;
+
+    setLists((prev) =>
+      prev.map((list) =>
+        list.id === id
+          ? {
+              ...list,
+              name: trimmed,
+            }
+          : list,
+      ),
+    );
+  }
 
   const taskActions = useMemo(
     () => ({
@@ -97,6 +120,7 @@ export default function App() {
       setSelectedListId={setSelectedListId}
       taskActions={taskActions}
       addList={addList}
+      renameList={renameList}
     />
   );
 }
