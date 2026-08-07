@@ -1,8 +1,16 @@
 import { useMemo } from "react";
 
-export default function useTaskFilter({ tasks, search, filter, completed }) {
+export default function useTaskFilter({
+  tasks,
+  search,
+  filter,
+  completed,
+  selectedListId,
+}) {
   return useMemo(() => {
-    let filtered = tasks.filter((task) => task.completed === completed);
+    let filtered = tasks.filter(
+      (task) => task.completed === completed && task.listId === selectedListId,
+    );
 
     if (search.trim()) {
       filtered = filtered.filter(
@@ -30,5 +38,5 @@ export default function useTaskFilter({ tasks, search, filter, completed }) {
     }
 
     return filtered;
-  }, [tasks, search, filter, completed]);
+  }, [tasks, search, filter, completed, selectedListId]);
 }

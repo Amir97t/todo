@@ -1,19 +1,41 @@
 import { BrowserRouter, Routes, Route } from "react-router-dom";
-import Home from "../pages/Home";
-import Completed from "../pages/Completed";
+import Inbox from "../pages/Inbox";
 
-export default function Router({ tasks, taskActions }) {
+export default function Router({
+  tasks,
+  taskActions,
+  lists,
+  selectedListId,
+  setSelectedListId,
+}) {
   return (
-    <BrowserRouter>
+    // <=====
+    <BrowserRouter> 
       <Routes>
         <Route
           path="/"
-          element={<Home tasks={tasks} taskActions={taskActions} />}
+          element={
+            <Inbox
+              tasks={tasks}
+              taskActions={taskActions}
+              lists={lists}
+              selectedListId={selectedListId}
+              setSelectedListId={setSelectedListId}
+            />
+          }
         />
 
         <Route
           path="/completed"
-          element={<Completed tasks={tasks} taskActions={taskActions} />}
+          element={
+            <Inbox
+              tasks={tasks}
+              taskActions={taskActions}
+              lists={lists}
+              selectedListId={selectedListId}
+              setSelectedListId={setSelectedListId}
+            />
+          }
         />
       </Routes>
     </BrowserRouter>
