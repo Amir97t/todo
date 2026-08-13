@@ -1,5 +1,6 @@
 import { BrowserRouter, Routes, Route } from "react-router-dom";
 import Inbox from "../pages/Inbox";
+import Completed from "../pages/Completed";
 
 export default function Router({
   tasks,
@@ -32,7 +33,7 @@ export default function Router({
         <Route
           path="/completed"
           element={
-            <Inbox
+            <Completed
               tasks={tasks}
               taskActions={taskActions}
               lists={lists}
