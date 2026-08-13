@@ -3,7 +3,7 @@ import NewListForm from "../list/NewListForm";
 import { useState } from "react";
 
 export default function Sidebar({
-  onAddList,
+  addList,
   lists,
   selectedListId,
   onSelect,
@@ -43,7 +43,7 @@ export default function Sidebar({
 
       {/* Bottom actions */}
       <div className="border-t border-zinc-800 p-4">
-        <NewListForm onSave={onAddList} />
+        <NewListForm onSave={addList} />
       </div>
     </aside>
   );

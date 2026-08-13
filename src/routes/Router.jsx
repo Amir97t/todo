@@ -8,6 +8,7 @@ export default function Router({
   selectedListId,
   setSelectedListId,
   addList,
+  renameList,
 }) {
   return (
     // <=====
@@ -22,6 +23,8 @@ export default function Router({
               lists={lists}
               selectedListId={selectedListId}
               setSelectedListId={setSelectedListId}
+              addList={addList}
+              renameList={renameList}
             />
           }
         />

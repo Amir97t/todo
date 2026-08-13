@@ -1,24 +1,48 @@
 import { useMemo, useState, useEffect } from "react";
 import Router from "./routes/Router";
 
-const STORAGE_KEY = "todo-app-tasks";
+const LISTS_STORAGE_KEY = "todo-app-lists";
+const TASKS_STORAGE_KEY = "todo-app-tasks";
+const SELECTED_LIST_STORAGE_KEY = "todo-app-selected-list";
 
 export default function App() {
-  const [lists, setLists] = useState([
-    { id: "inbox", name: "Inbox" },
-    { id: "gym", name: "Gym" },
-    { id: "work", name: "Work" },
-  ]);
+  // App owns persistent application data.
+  // Components only display and update this data.
+  const [lists, setLists] = useState(() => {
+    const saved = localStorage.getItem(LISTS_STORAGE_KEY);
 
-  const [selectedListId, setSelectedListId] = useState("inbox");
+    return saved
+      ? JSON.parse(saved)
+      : [
+          {
+            id: "inbox",
+            name: "Inbox",
+          },
+        ];
+  });
+
   const [tasks, setTasks] = useState(() => {
-    const saved = localStorage.getItem(STORAGE_KEY);
+    const saved = localStorage.getItem(TASKS_STORAGE_KEY);
+
     return saved ? JSON.parse(saved) : [];
   });
 
+  // Keep the currently selected list persistent across page reloads.
+  const [selectedListId, setSelectedListId] = useState(() => {
+    return localStorage.getItem(SELECTED_LIST_STORAGE_KEY) || "inbox";
+  });
+
   useEffect(() => {
-    localStorage.setItem(STORAGE_KEY, JSON.stringify(tasks));
+    localStorage.setItem(LISTS_STORAGE_KEY, JSON.stringify(lists));
+  }, [lists]);
+
+  useEffect(() => {
+    localStorage.setItem(TASKS_STORAGE_KEY, JSON.stringify(tasks));
   }, [tasks]);
+
+  useEffect(() => {
+    localStorage.setItem(SELECTED_LIST_STORAGE_KEY, selectedListId);
+  }, [selectedListId]);
 
   function addList(name) {
     const trimmed = name.trim();
@@ -37,47 +61,11 @@ export default function App() {
     };
 
     setLists((prev) => [...prev, newList]);
+
+    // Automatically open the newly created list.
     setSelectedListId(newList.id);
   }
 
-  function addTask(title, description, listId) {
-    if (!title.trim()) return;
-
-    const newTask = {
-      id: crypto.randomUUID(),
-      title,
-      description,
-      listId,
-      completed: false,
-      createdAt: Date.now(),
-    };
-    setTasks((prev) => [...prev, newTask]);
-  }
-
-  function deleteTask(id) {
-    setTasks((prev) => prev.filter((task) => task.id !== id));
-  }
-
-  function toggleTask(id) {
-    setTasks((prev) =>
-      prev.map((task) =>
-        task.id === id ? { ...task, completed: !task.completed } : task,
-      ),
-    );
-  }
-
-  function editTask(id, updatedTask) {
-    setTasks((prev) =>
-      prev.map((task) =>
-        task.id === id
-          ? {
-              ...task,
-              ...updatedTask,
-            }
-          : task,
-      ),
-    );
-  }
   function renameList(id, name) {
     const trimmed = name.trim();
 
@@ -102,6 +90,51 @@ export default function App() {
     );
   }
 
+  function addTask(title, description, listId) {
+    if (!title.trim()) return;
+
+    const newTask = {
+      id: crypto.randomUUID(),
+      title,
+      description,
+      listId,
+      completed: false,
+      createdAt: Date.now(),
+    };
+
+    setTasks((prev) => [...prev, newTask]);
+  }
+
+  function deleteTask(id) {
+    setTasks((prev) => prev.filter((task) => task.id !== id));
+  }
+
+  function toggleTask(id) {
+    setTasks((prev) =>
+      prev.map((task) =>
+        task.id === id
+          ? {
+              ...task,
+              completed: !task.completed,
+            }
+          : task,
+      ),
+    );
+  }
+
+  function editTask(id, updatedTask) {
+    setTasks((prev) =>
+      prev.map((task) =>
+        task.id === id
+          ? {
+              ...task,
+              ...updatedTask,
+            }
+          : task,
+      ),
+    );
+  }
+
   const taskActions = useMemo(
     () => ({
       addTask,
@@ -115,12 +148,12 @@ export default function App() {
   return (
     <Router
       tasks={tasks}
-      lists={lists}
-      selectedListId={selectedListId}
-      setSelectedListId={setSelectedListId}
       taskActions={taskActions}
+      lists={lists}
       addList={addList}
       renameList={renameList}
+      selectedListId={selectedListId}
+      setSelectedListId={setSelectedListId}
     />
   );
 }

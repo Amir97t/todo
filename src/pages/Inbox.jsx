@@ -9,16 +9,16 @@ import FilterBar from "../components/task/FIlterBar";
 import EmptyState from "../components/common/EmptyState";
 import Sidebar from "../components/layout/Sidebar";
 
-export default function Home({
+export default function Inbox({
   tasks,
   lists,
   selectedListId,
   setSelectedListId,
   taskActions,
   addList,
+  renameList,
 }) {
   const [editingId, setEditingId] = useState(null);
-  console.log("editingId:", editingId);
   const { addTask } = taskActions;
 
   const [search, setSearch] = useState("");
@@ -33,13 +33,18 @@ export default function Home({
 
   const hasActiveTasks = tasks.some((task) => !task.completed);
 
+  function handleAddTask(title, description) {
+    addTask(title, description, selectedListId);
+  }
+
   return (
     <main className="flex min-h-screen bg-zinc-950 text-white">
       <Sidebar
         lists={lists}
         selectedListId={selectedListId}
         onSelect={setSelectedListId}
-        onAddList={addList}
+        addList={addList}
+        renameList={renameList}
       />
       <div className="flex-1 p-8">
         <div className="mx-auto max-w-4xl">
@@ -48,7 +53,8 @@ export default function Home({
           <p className="mb-8 text-center text-zinc-400">
             Focus on your active tasks.
           </p>
-          <AddTaskCard onAddTask={addTask} selectedListId={selectedListId} />
+
+          <AddTaskCard onAddTask={handleAddTask} />
           <div className="mt-8">
             <SearchBar value={search} onChange={setSearch} />
             <div className="mb-4 flex items-center justify-between gap-4">

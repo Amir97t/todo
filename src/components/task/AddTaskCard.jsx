@@ -1,5 +1,4 @@
 import { useState } from "react";
-
 import Button from "../ui/Button";
 import Input from "../ui/Input";
 import Textarea from "../ui/Textarea";
@@ -13,22 +12,25 @@ import {
   CardFooter,
 } from "../ui/Card";
 
-export default function AddTaskCard({ onAddTask, selectedListId }) {
+export default function AddTaskCard({ onAddTask }) {
   const [title, setTitle] = useState("");
   const [description, setDescription] = useState("");
 
   function handleSubmit() {
-    onAddTask(title, description, selectedListId);
+    // Let the parent decide which list the task belongs to.
+    // AddTaskCard only manages the form itself.
+    if (!title.trim()) return;
+
+    onAddTask(title, description);
 
     setTitle("");
     setDescription("");
   }
 
   return (
-    <Card className="mb-8">
+    <Card>
       <CardHeader>
         <CardTitle>Add Task</CardTitle>
-
         <CardDescription>Add a new task.</CardDescription>
       </CardHeader>
 
