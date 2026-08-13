@@ -8,15 +8,21 @@ export default function useTaskFilter({
   selectedListId,
 }) {
   return useMemo(() => {
-    let filtered = tasks.filter(
-      (task) => task.completed === completed && task.listId === selectedListId,
-    );
+    let filtered = tasks.filter((task) => task.completed === completed);
+
+    // Apply list filtering only when a list is explicitly selected.
+    // This keeps Completed as a global view while Inbox can stay list-specific.
+    if (selectedListId) {
+      filtered = filtered.filter((task) => task.listId === selectedListId);
+    }
 
     if (search.trim()) {
+      const query = search.toLowerCase();
+
       filtered = filtered.filter(
         (task) =>
-          task.title.toLowerCase().includes(search.toLowerCase()) ||
-          task.description.toLowerCase().includes(search.toLowerCase()),
+          task.title.toLowerCase().includes(query) ||
+          task.description.toLowerCase().includes(query),
       );
     }
 
