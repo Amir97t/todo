@@ -1,7 +1,8 @@
-import { useEffect, useState } from "react";
+import { useState } from "react";
 import Button from "../ui/Button";
 import { Card } from "../ui/Card";
 import Input from "../ui/Input";
+import ConfirmDialog from "../common/ConfirmDialog";
 
 export default function TaskItem({
   task,
@@ -9,21 +10,20 @@ export default function TaskItem({
   editingId,
   onStartEdit,
 }) {
-  const { deleteTask, toggleTask, editTask } = taskActions;
+  const { toggleTask, editTask } = taskActions;
 
   const isCurrentEditingTask = editingId === task.id;
 
   const [title, setTitle] = useState(task.title);
   const [description, setDescription] = useState(task.description);
-
-  useEffect(() => {
-    if (!isCurrentEditingTask) return;
-
-    setTitle(task.title);
-    setDescription(task.description);
-  }, [isCurrentEditingTask, task.title, task.description]);
+  const [isDeleteOpen, setIsDeleteOpen] = useState(false);
 
   function handleStartEdit() {
+    // Initialize the local form state when editing starts.
+    // This avoids using an Effect just to mirror task props into state.
+    setTitle(task.title);
+    setDescription(task.description);
+
     onStartEdit(task.id);
   }
 
@@ -94,16 +94,35 @@ export default function TaskItem({
         ) : (
           <>
             <Button
+              className="bg-red-700 hover:bg-red-600"
+              onClick={() => setIsDeleteOpen(true)}
+            >
+              Delete
+            </Button>
+            {/* <Button
               className="bg-red-600 hover:bg-red-500"
               onClick={() => deleteTask(task.id)}
             >
               Delete
-            </Button>
+            </Button> */}
 
             <Button onClick={handleStartEdit}>Edit</Button>
           </>
         )}
       </div>
+      <ConfirmDialog
+        open={isDeleteOpen}
+        title="Delete task?"
+        description={`Are you sure you want to delete "${task.title}"? This action cannot be undone.`}
+        confirmLabel="Delete"
+        onCancel={() => setIsDeleteOpen(false)}
+        onConfirm={() => {
+          // The dialog only confirms the action.
+          // TaskItem delegates the actual data mutation to App.
+          taskActions.deleteTask(task.id);
+          setIsDeleteOpen(false);
+        }}
+      />
     </Card>
   );
 }
