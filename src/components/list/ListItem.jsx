@@ -49,49 +49,59 @@ export default function ListItem({
       }`}
     >
       {isEditing ? (
-        <div className="flex items-center gap-2">
+        // The input gets the full available width while actions move below it.
+        // This keeps editing usable inside the narrow sidebar.
+        <div className="space-y-2">
           <Input
-            className="flex-1"
+            className="w-full"
             value={name}
             onChange={(e) => setName(e.target.value)}
             onKeyDown={handleKeyDown}
             autoFocus
           />
 
-          <Button
-            className="bg-green-600 hover:bg-green-500"
-            onClick={handleSave}
-          >
-            Save
-          </Button>
+          <div className="flex gap-2">
+            <Button
+              className="flex-1 bg-green-600 hover:bg-green-500"
+              onClick={handleSave}
+            >
+              Save
+            </Button>
 
-          <Button className="bg-zinc-700 hover:bg-zinc-600" onClick={onCancel}>
-            Cancel
-          </Button>
+            <Button
+              className="flex-1 bg-zinc-700 hover:bg-zinc-600"
+              onClick={onCancel}
+            >
+              Cancel
+            </Button>
+          </div>
         </div>
       ) : (
-        <div className="flex items-center justify-between gap-2">
+        <div className="flex min-w-0 items-center gap-2">
           <button
-            className="flex-1 text-left"
+            className="min-w-0 flex-1 truncate text-left"
             onClick={() => onSelect(list.id)}
           >
             {list.name}
           </button>
 
-          <Button
-            className="bg-zinc-700 hover:bg-zinc-600"
-            onClick={handleStartEdit}
-          >
-            Edit
-          </Button>
-          {list.id !== "inbox" && (
+          <div className="flex shrink-0 gap-2">
             <Button
-              className="bg-red-700 hover:bg-red-600"
-              onClick={() => onDelete(list)}
+              className="bg-zinc-700 hover:bg-zinc-600"
+              onClick={handleStartEdit}
             >
-              Delete
+              Edit
             </Button>
-          )}
+
+            {list.id !== "inbox" && (
+              <Button
+                className="bg-red-700 hover:bg-red-600"
+                onClick={() => onDelete(list)}
+              >
+                Delete
+              </Button>
+            )}
+          </div>
         </div>
       )}
     </div>
