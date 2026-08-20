@@ -7,7 +7,7 @@ const SELECTED_LIST_STORAGE_KEY = "todo-app-selected-list";
 
 export default function App() {
   // App owns persistent application data.
-  // Components only display and update this data.
+  // Child components receive data and actions instead of owning global state.
   const [lists, setLists] = useState(() => {
     const saved = localStorage.getItem(LISTS_STORAGE_KEY);
 
@@ -105,6 +105,35 @@ export default function App() {
     setTasks((prev) => [...prev, newTask]);
   }
 
+  function deleteList(id, deleteTasks = false) {
+    // App owns destructive data operations because it is the source of truth.
+    if (id === "inbox") return;
+
+    if (deleteTasks) {
+      // Delete the list and all tasks that belong to it.
+      setTasks((prev) => prev.filter((task) => task.listId !== id));
+    } else {
+      // Keep the tasks alive by moving them back to Inbox.
+      setTasks((prev) =>
+        prev.map((task) =>
+          task.listId === id
+            ? {
+                ...task,
+                listId: "inbox",
+              }
+            : task,
+        ),
+      );
+    }
+
+    setLists((prev) => prev.filter((list) => list.id !== id));
+
+    // Prevent the app from staying on a list that no longer exists.
+    if (selectedListId === id) {
+      setSelectedListId("inbox");
+    }
+  }
+
   function deleteTask(id) {
     setTasks((prev) => prev.filter((task) => task.id !== id));
   }
@@ -152,6 +181,7 @@ export default function App() {
       lists={lists}
       addList={addList}
       renameList={renameList}
+      deleteList={deleteList}
       selectedListId={selectedListId}
       setSelectedListId={setSelectedListId}
     />

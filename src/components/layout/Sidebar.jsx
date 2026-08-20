@@ -1,6 +1,7 @@
 import ListItem from "../list/ListItem";
 import NewListForm from "../list/NewListForm";
 import { useState } from "react";
+import ConfirmDialog from "../common/ConfirmDialog";
 
 export default function Sidebar({
   addList,
@@ -8,6 +9,7 @@ export default function Sidebar({
   selectedListId,
   onSelect,
   renameList,
+  deleteList,
 }) {
   // UI state belongs here.
   // App only manages the data.
@@ -15,9 +17,30 @@ export default function Sidebar({
   // Keep editing state close to where it's used.
   // App doesn't need to know which list is being edited.
 
+  const [deleteTarget, setDeleteTarget] = useState(null);
+
   function handleRename(id, name) {
     renameList(id, name);
     setEditingId(null);
+  }
+
+  function handleDeleteRequest(list) {
+    // Store the selected list so the confirmation UI knows what to delete.
+    setDeleteTarget(list);
+  }
+
+  function handleDeleteList() {
+    if (!deleteTarget) return;
+
+    deleteList(deleteTarget.id, false);
+    setDeleteTarget(null);
+  }
+
+  function handleDeleteListAndTasks() {
+    if (!deleteTarget) return;
+
+    deleteList(deleteTarget.id, true);
+    setDeleteTarget(null);
   }
 
   return (
@@ -36,15 +59,28 @@ export default function Sidebar({
               onStartEdit={setEditingId}
               onRename={handleRename}
               onCancel={() => setEditingId(null)}
+              onDelete={handleDeleteRequest}
             />
           ))}
         </div>
       </div>
 
-      {/* Bottom actions */}
       <div className="border-t border-zinc-800 p-4">
         <NewListForm onSave={addList} />
       </div>
+
+      {deleteTarget && (
+        <ConfirmDialog
+          open={true}
+          title={`Delete "${deleteTarget.name}"?`}
+          description="Choose what should happen to the tasks inside this list."
+          onCancel={() => setDeleteTarget(null)}
+          confirmLabel="Delete List"
+          onConfirm={handleDeleteList}
+          secondaryLabel="Delete List & Tasks"
+          onSecondaryConfirm={handleDeleteListAndTasks}
+        />
+      )}
     </aside>
   );
 }

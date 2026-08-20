@@ -10,6 +10,7 @@ export default function Router({
   setSelectedListId,
   addList,
   renameList,
+  deleteList,
 }) {
   return (
     // <=====
@@ -26,6 +27,7 @@ export default function Router({
               setSelectedListId={setSelectedListId}
               addList={addList}
               renameList={renameList}
+              deleteList={deleteList}
             />
           }
         />
@@ -40,6 +42,7 @@ export default function Router({
               selectedListId={selectedListId}
               setSelectedListId={setSelectedListId}
               addList={addList}
+              deleteList={deleteList}
             />
           }
         />

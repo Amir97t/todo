@@ -10,6 +10,7 @@ export default function ListItem({
   onStartEdit,
   onRename,
   onCancel,
+  onDelete,
 }) {
   // Local state is only for the input value.
   // The actual list name lives in App state.
@@ -83,6 +84,14 @@ export default function ListItem({
           >
             Edit
           </Button>
+          {list.id !== "inbox" && (
+            <Button
+              className="bg-red-700 hover:bg-red-600"
+              onClick={() => onDelete(list)}
+            >
+              Delete
+            </Button>
+          )}
         </div>
       )}
     </div>

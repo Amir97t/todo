@@ -17,6 +17,7 @@ export default function Inbox({
   taskActions,
   addList,
   renameList,
+  deleteList,
 }) {
   const [editingId, setEditingId] = useState(null);
   const { addTask } = taskActions;
@@ -45,6 +46,7 @@ export default function Inbox({
         onSelect={setSelectedListId}
         addList={addList}
         renameList={renameList}
+        deleteList={deleteList}
       />
       <div className="flex-1 p-8">
         <div className="mx-auto max-w-4xl">
