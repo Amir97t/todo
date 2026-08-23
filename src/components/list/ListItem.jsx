@@ -1,6 +1,6 @@
-import { useState } from "react";
 import Input from "../ui/Input";
 import Button from "../ui/Button";
+import useInlineEditing from "../../hooks/useInlineEditing";
 
 export default function ListItem({
   list,
@@ -12,15 +12,14 @@ export default function ListItem({
   onCancel,
   onDelete,
 }) {
-  // Local state is only for the input value.
-  // The actual list name lives in App state.
-  const [name, setName] = useState(list.name);
-  const isEditing = editingId === list.id;
+  const { value: name, setValue: setName, startEditing } = useInlineEditing();
+
+  const isCurrentEditingList = editingId === list.id;
 
   function handleStartEdit() {
-    // Initialize the local input when editing starts.
-    // This avoids synchronously updating state inside an Effect.
-    setName(list.name);
+    // Keep the current list name inside local editing state.
+    // Sidebar/App only need to know which list is being edited.
+    startEditing(list.name);
     onStartEdit(list.id);
   }
 
@@ -30,6 +29,12 @@ export default function ListItem({
     if (!trimmed) return;
 
     onRename(list.id, trimmed);
+
+    onCancel();
+  }
+
+  function handleCancel() {
+    onCancel();
   }
 
   function handleKeyDown(e) {
@@ -38,7 +43,7 @@ export default function ListItem({
     }
 
     if (e.key === "Escape") {
-      onCancel();
+      handleCancel();
     }
   }
 
@@ -48,13 +53,11 @@ export default function ListItem({
         selected ? "border-blue-500 bg-zinc-800" : "border-transparent"
       }`}
     >
-      {isEditing ? (
-        // The input gets the full available width while actions move below it.
-        // This keeps editing usable inside the narrow sidebar.
+      {isCurrentEditingList ? (
         <div className="space-y-2">
           <Input
             className="w-full"
-            value={name}
+            value={name ?? ""}
             onChange={(e) => setName(e.target.value)}
             onKeyDown={handleKeyDown}
             autoFocus
@@ -70,7 +73,7 @@ export default function ListItem({
 
             <Button
               className="flex-1 bg-zinc-700 hover:bg-zinc-600"
-              onClick={onCancel}
+              onClick={handleCancel}
             >
               Cancel
             </Button>

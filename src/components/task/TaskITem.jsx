@@ -3,6 +3,7 @@ import Button from "../ui/Button";
 import { Card } from "../ui/Card";
 import Input from "../ui/Input";
 import ConfirmDialog from "../common/ConfirmDialog";
+import useInlineEditing from "../../hooks/useInlineEditing";
 
 export default function TaskItem({
   task,
@@ -12,36 +13,41 @@ export default function TaskItem({
 }) {
   const { toggleTask, editTask } = taskActions;
 
+  const {
+    value: editValues,
+    setValue: setEditValues,
+    startEditing,
+  } = useInlineEditing();
+
+  const [isDeleteOpen, setIsDeleteOpen] = useState(false);
   const isCurrentEditingTask = editingId === task.id;
 
-  const [title, setTitle] = useState(task.title);
-  const [description, setDescription] = useState(task.description);
-  const [isDeleteOpen, setIsDeleteOpen] = useState(false);
-
   function handleStartEdit() {
-    // Initialize the local form state when editing starts.
-    // This avoids using an Effect just to mirror task props into state.
-    setTitle(task.title);
-    setDescription(task.description);
+    // Start with a snapshot of the current task values.
+    // Editing state stays local to the task UI.
+    startEditing({
+      title: task.title,
+      description: task.description,
+    });
 
     onStartEdit(task.id);
   }
 
   function handleSave() {
-    if (!title.trim()) return;
+    const title = editValues?.title?.trim() ?? "";
+    const description = editValues?.description?.trim() ?? "";
+
+    if (!title) return;
 
     editTask(task.id, {
-      title: title.trim(),
-      description: description.trim(),
+      title,
+      description,
     });
 
     onStartEdit(null);
   }
 
   function handleCancel() {
-    setTitle(task.title);
-    setDescription(task.description);
-
     onStartEdit(null);
   }
 
@@ -56,19 +62,30 @@ export default function TaskItem({
 
         <div className="flex-1">
           {isCurrentEditingTask ? (
-            <>
+            <div className="space-y-1">
               <Input
-                value={title}
-                onChange={(e) => setTitle(e.target.value)}
+                value={editValues?.title ?? ""}
+                onChange={(e) =>
+                  setEditValues((prev) => ({
+                    ...prev,
+                    title: e.target.value,
+                  }))
+                }
                 className="border-none bg-transparent p-0 text-lg font-semibold shadow-none focus:ring-0"
+                autoFocus
               />
 
               <Input
-                value={description}
-                onChange={(e) => setDescription(e.target.value)}
-                className="mt-1 border-none bg-transparent p-0 text-sm text-zinc-400 shadow-none focus:ring-0"
+                value={editValues?.description ?? ""}
+                onChange={(e) =>
+                  setEditValues((prev) => ({
+                    ...prev,
+                    description: e.target.value,
+                  }))
+                }
+                className="border-none bg-transparent p-0 text-sm text-zinc-400 shadow-none focus:ring-0"
               />
-            </>
+            </div>
           ) : (
             <>
               <h3 className="font-semibold">{task.title}</h3>
@@ -79,7 +96,7 @@ export default function TaskItem({
         </div>
       </div>
 
-      <div className="ml-4 flex gap-2">
+      <div className="ml-4 flex shrink-0 gap-2">
         {isCurrentEditingTask ? (
           <>
             <Button onClick={handleSave}>Save</Button>
@@ -99,17 +116,12 @@ export default function TaskItem({
             >
               Delete
             </Button>
-            {/* <Button
-              className="bg-red-600 hover:bg-red-500"
-              onClick={() => deleteTask(task.id)}
-            >
-              Delete
-            </Button> */}
 
             <Button onClick={handleStartEdit}>Edit</Button>
           </>
         )}
       </div>
+
       <ConfirmDialog
         open={isDeleteOpen}
         title="Delete task?"
@@ -117,8 +129,7 @@ export default function TaskItem({
         confirmLabel="Delete"
         onCancel={() => setIsDeleteOpen(false)}
         onConfirm={() => {
-          // The dialog only confirms the action.
-          // TaskItem delegates the actual data mutation to App.
+          // The dialog confirms the action; App still owns the data mutation.
           taskActions.deleteTask(task.id);
           setIsDeleteOpen(false);
         }}
