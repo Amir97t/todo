@@ -1,48 +1,27 @@
-import { useMemo, useState, useEffect } from "react";
 import Router from "./routes/Router";
+import useLocalStorage from "./hooks/useLocalStorage";
 
 const LISTS_STORAGE_KEY = "todo-app-lists";
 const TASKS_STORAGE_KEY = "todo-app-tasks";
 const SELECTED_LIST_STORAGE_KEY = "todo-app-selected-list";
 
+const DEFAULT_LISTS = [
+  {
+    id: "inbox",
+    name: "Inbox",
+  },
+];
+
 export default function App() {
-  // App owns persistent application data.
-  // Child components receive data and actions instead of owning global state.
-  const [lists, setLists] = useState(() => {
-    const saved = localStorage.getItem(LISTS_STORAGE_KEY);
+  // App owns application data; persistence is handled by useLocalStorage.
+  const [lists, setLists] = useLocalStorage(LISTS_STORAGE_KEY, DEFAULT_LISTS);
 
-    return saved
-      ? JSON.parse(saved)
-      : [
-          {
-            id: "inbox",
-            name: "Inbox",
-          },
-        ];
-  });
+  const [tasks, setTasks] = useLocalStorage(TASKS_STORAGE_KEY, []);
 
-  const [tasks, setTasks] = useState(() => {
-    const saved = localStorage.getItem(TASKS_STORAGE_KEY);
-
-    return saved ? JSON.parse(saved) : [];
-  });
-
-  // Keep the currently selected list persistent across page reloads.
-  const [selectedListId, setSelectedListId] = useState(() => {
-    return localStorage.getItem(SELECTED_LIST_STORAGE_KEY) || "inbox";
-  });
-
-  useEffect(() => {
-    localStorage.setItem(LISTS_STORAGE_KEY, JSON.stringify(lists));
-  }, [lists]);
-
-  useEffect(() => {
-    localStorage.setItem(TASKS_STORAGE_KEY, JSON.stringify(tasks));
-  }, [tasks]);
-
-  useEffect(() => {
-    localStorage.setItem(SELECTED_LIST_STORAGE_KEY, selectedListId);
-  }, [selectedListId]);
+  const [selectedListId, setSelectedListId] = useLocalStorage(
+    SELECTED_LIST_STORAGE_KEY,
+    "inbox",
+  );
 
   function addList(name) {
     const trimmed = name.trim();
@@ -62,7 +41,7 @@ export default function App() {
 
     setLists((prev) => [...prev, newList]);
 
-    // Automatically open the newly created list.
+    // Open the newly created list immediately.
     setSelectedListId(newList.id);
   }
 
@@ -90,30 +69,13 @@ export default function App() {
     );
   }
 
-  function addTask(title, description, listId) {
-    if (!title.trim()) return;
-
-    const newTask = {
-      id: crypto.randomUUID(),
-      title,
-      description,
-      listId,
-      completed: false,
-      createdAt: Date.now(),
-    };
-
-    setTasks((prev) => [...prev, newTask]);
-  }
-
   function deleteList(id, deleteTasks = false) {
-    // App owns destructive data operations because it is the source of truth.
+    // App owns destructive operations because it owns the source data.
     if (id === "inbox") return;
 
     if (deleteTasks) {
-      // Delete the list and all tasks that belong to it.
       setTasks((prev) => prev.filter((task) => task.listId !== id));
     } else {
-      // Keep the tasks alive by moving them back to Inbox.
       setTasks((prev) =>
         prev.map((task) =>
           task.listId === id
@@ -128,10 +90,26 @@ export default function App() {
 
     setLists((prev) => prev.filter((list) => list.id !== id));
 
-    // Prevent the app from staying on a list that no longer exists.
     if (selectedListId === id) {
       setSelectedListId("inbox");
     }
+  }
+
+  function addTask(title, description, listId) {
+    const trimmedTitle = title.trim();
+
+    if (!trimmedTitle) return;
+
+    const newTask = {
+      id: crypto.randomUUID(),
+      title: trimmedTitle,
+      description: description.trim(),
+      listId,
+      completed: false,
+      createdAt: Date.now(),
+    };
+
+    setTasks((prev) => [...prev, newTask]);
   }
 
   function deleteTask(id) {
@@ -164,15 +142,12 @@ export default function App() {
     );
   }
 
-  const taskActions = useMemo(
-    () => ({
-      addTask,
-      deleteTask,
-      toggleTask,
-      editTask,
-    }),
-    [],
-  );
+  const taskActions = {
+    addTask,
+    deleteTask,
+    toggleTask,
+    editTask,
+  };
 
   return (
     <Router
