@@ -84,10 +84,23 @@ export default function TaskItem({
     });
   }
 
-
-
   function handleDeleteChecklistItem(itemId) {
     const updatedChecklist = checklist.filter((item) => item.id !== itemId);
+
+    editTask(task.id, {
+      checklist: updatedChecklist,
+    });
+  }
+
+  function handleEditChecklistItem(itemId, text) {
+    const updatedChecklist = checklist.map((item) =>
+      item.id === itemId
+        ? {
+            ...item,
+            text,
+          }
+        : item,
+    );
 
     editTask(task.id, {
       checklist: updatedChecklist,
@@ -144,6 +157,7 @@ export default function TaskItem({
                     onAdd={handleAddChecklistItem}
                     onToggle={handleToggleChecklistItem}
                     onDelete={handleDeleteChecklistItem}
+                    onEdit={handleEditChecklistItem}
                   />
                 </div>
               )}
