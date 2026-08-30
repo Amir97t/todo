@@ -4,6 +4,7 @@ import { Card } from "../ui/Card";
 import Input from "../ui/Input";
 import ConfirmDialog from "../common/ConfirmDialog";
 import useInlineEditing from "../../hooks/useInlineEditing";
+import TaskChecklist from "./TaskChecklist";
 
 export default function TaskItem({
   task,
@@ -71,6 +72,28 @@ export default function TaskItem({
     });
   }
 
+  function handleAddChecklistItem(text) {
+    const newItem = {
+      id: crypto.randomUUID(),
+      text,
+      completed: false,
+    };
+
+    editTask(task.id, {
+      checklist: [...checklist, newItem],
+    });
+  }
+
+
+
+  function handleDeleteChecklistItem(itemId) {
+    const updatedChecklist = checklist.filter((item) => item.id !== itemId);
+
+    editTask(task.id, {
+      checklist: updatedChecklist,
+    });
+  }
+
   return (
     <Card className="flex items-center justify-between p-5">
       <div className="flex min-w-0 flex-1 gap-4">
@@ -116,25 +139,12 @@ export default function TaskItem({
 
               {checklist.length > 0 && (
                 <div className="mt-2 max-h-40 space-y-1 overflow-y-auto">
-                  {checklist.map((item) => (
-                    <label key={item.id} className="flex items-start gap-2">
-                      <input
-                        type="checkbox"
-                        checked={item.completed}
-                        onChange={() => handleToggleChecklistItem(item.id)}
-                      />
-
-                      <span
-                        className={
-                          item.completed
-                            ? "text-zinc-500 line-through"
-                            : "text-zinc-300"
-                        }
-                      >
-                        {item.text}
-                      </span>
-                    </label>
-                  ))}
+                  <TaskChecklist
+                    items={checklist}
+                    onAdd={handleAddChecklistItem}
+                    onToggle={handleToggleChecklistItem}
+                    onDelete={handleDeleteChecklistItem}
+                  />
                 </div>
               )}
             </>
