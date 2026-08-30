@@ -87,24 +87,28 @@ export default function ListItem({
           >
             {list.name}
           </button>
+          {/* 
+    Inbox is a system list used as the default destination for tasks
+    when their original list is deleted.
+    Keep it stable so list deletion always has a valid fallback.
+  */}
+          {list.id !== "inbox" && (
+            <div className="flex shrink-0 gap-2">
+              <Button
+                className="bg-zinc-700 hover:bg-zinc-600"
+                onClick={handleStartEdit}
+              >
+                Edit
+              </Button>
 
-          <div className="flex shrink-0 gap-2">
-            <Button
-              className="bg-zinc-700 hover:bg-zinc-600"
-              onClick={handleStartEdit}
-            >
-              Edit
-            </Button>
-
-            {list.id !== "inbox" && (
               <Button
                 className="bg-red-700 hover:bg-red-600"
                 onClick={() => onDelete(list)}
               >
                 Delete
               </Button>
-            )}
-          </div>
+            </div>
+          )}
         </div>
       )}
     </div>

@@ -20,11 +20,15 @@ export default function TaskItem({
   } = useInlineEditing();
 
   const [isDeleteOpen, setIsDeleteOpen] = useState(false);
+
   const isCurrentEditingTask = editingId === task.id;
 
+  // Prevent old or malformed task data from breaking the task card.
+  const checklist = Array.isArray(task.checklist) ? task.checklist : [];
+
   function handleStartEdit() {
-    // Start with a snapshot of the current task values.
-    // Editing state stays local to the task UI.
+    // Take a snapshot of the current task when editing starts.
+    // The parent still owns the actual task data.
     startEditing({
       title: task.title,
       description: task.description,
@@ -51,18 +55,34 @@ export default function TaskItem({
     onStartEdit(null);
   }
 
+  function handleToggleChecklistItem(itemId) {
+    const updatedChecklist = checklist.map((item) =>
+      item.id === itemId
+        ? {
+            ...item,
+            completed: !item.completed,
+          }
+        : item,
+    );
+
+    // Keep checklist as a separate field from the free-form description.
+    editTask(task.id, {
+      checklist: updatedChecklist,
+    });
+  }
+
   return (
     <Card className="flex items-center justify-between p-5">
-      <div className="flex flex-1 gap-4">
+      <div className="flex min-w-0 flex-1 gap-4">
         <input
           type="checkbox"
           checked={task.completed}
           onChange={() => toggleTask(task.id)}
         />
 
-        <div className="flex-1">
+        <div className="min-w-0 flex-1">
           {isCurrentEditingTask ? (
-            <div className="space-y-1">
+            <div className="space-y-2">
               <Input
                 value={editValues?.title ?? ""}
                 onChange={(e) =>
@@ -90,7 +110,33 @@ export default function TaskItem({
             <>
               <h3 className="font-semibold">{task.title}</h3>
 
-              <p className="text-sm text-zinc-400">{task.description}</p>
+              {task.description && (
+                <p className="mt-1 text-sm text-zinc-400">{task.description}</p>
+              )}
+
+              {checklist.length > 0 && (
+                <div className="mt-2 max-h-40 space-y-1 overflow-y-auto">
+                  {checklist.map((item) => (
+                    <label key={item.id} className="flex items-start gap-2">
+                      <input
+                        type="checkbox"
+                        checked={item.completed}
+                        onChange={() => handleToggleChecklistItem(item.id)}
+                      />
+
+                      <span
+                        className={
+                          item.completed
+                            ? "text-zinc-500 line-through"
+                            : "text-zinc-300"
+                        }
+                      >
+                        {item.text}
+                      </span>
+                    </label>
+                  ))}
+                </div>
+              )}
             </>
           )}
         </div>
@@ -129,7 +175,7 @@ export default function TaskItem({
         confirmLabel="Delete"
         onCancel={() => setIsDeleteOpen(false)}
         onConfirm={() => {
-          // The dialog confirms the action; App still owns the data mutation.
+          // Confirmation handles the UI decision; App performs the mutation.
           taskActions.deleteTask(task.id);
           setIsDeleteOpen(false);
         }}

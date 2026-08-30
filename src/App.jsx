@@ -12,11 +12,13 @@ const DEFAULT_LISTS = [
   },
 ];
 
+const DEFAULT_TASKS = [];
+
 export default function App() {
   // App owns application data; persistence is handled by useLocalStorage.
   const [lists, setLists] = useLocalStorage(LISTS_STORAGE_KEY, DEFAULT_LISTS);
 
-  const [tasks, setTasks] = useLocalStorage(TASKS_STORAGE_KEY, []);
+  const [tasks, setTasks] = useLocalStorage(TASKS_STORAGE_KEY, DEFAULT_TASKS);
 
   const [selectedListId, setSelectedListId] = useLocalStorage(
     SELECTED_LIST_STORAGE_KEY,
@@ -95,7 +97,7 @@ export default function App() {
     }
   }
 
-  function addTask(title, description, listId) {
+  function addTask(title, description, checklist, listId) {
     const trimmedTitle = title.trim();
 
     if (!trimmedTitle) return;
@@ -104,6 +106,7 @@ export default function App() {
       id: crypto.randomUUID(),
       title: trimmedTitle,
       description: description.trim(),
+      checklist,
       listId,
       completed: false,
       createdAt: Date.now(),

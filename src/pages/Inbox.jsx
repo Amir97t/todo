@@ -34,8 +34,10 @@ export default function Inbox({
 
   const hasActiveTasks = tasks.some((task) => !task.completed);
 
-  function handleAddTask(title, description) {
-    addTask(title, description, selectedListId);
+  function handleAddTask(title, description, checklist) {
+    // Inbox supplies the active list context.
+    // AddTaskCard only manages task form data.
+    addTask(title, description, checklist, selectedListId);
   }
 
   return (
