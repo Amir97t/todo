@@ -19,6 +19,10 @@ export default function Sidebar({
 
   const [deleteTarget, setDeleteTarget] = useState(null);
 
+  const [isCollapsed, setIsCollapsed] = useState(false);
+  // Collapse state belongs to the layout component.
+  // App does not need to know whether the sidebar is visually open.
+
   function handleRename(id, name) {
     renameList(id, name);
     setEditingId(null);
@@ -44,8 +48,19 @@ export default function Sidebar({
   }
 
   return (
-    <aside className="flex h-screen w-64 flex-col border-r border-zinc-800 bg-zinc-900">
+    <aside
+      className={`flex h-screen flex-col border-r border-zinc-800 bg-zinc-900 transition-all duration-200 ${
+        isCollapsed ? "w-16" : "w-64"
+      }`}
+    >
       <div className="flex-1 p-5">
+        <button
+          type="button"
+          className="mb-5 text-left text-zinc-400 hover:text-white"
+          onClick={() => setIsCollapsed((prev) => !prev)}
+        >
+          ☰
+        </button>
         <h2 className="mb-5 text-lg font-bold">Lists</h2>
 
         <div className="space-y-2">
@@ -60,6 +75,7 @@ export default function Sidebar({
               onRename={handleRename}
               onCancel={() => setEditingId(null)}
               onDelete={handleDeleteRequest}
+              collapsed={isCollapsed}
             />
           ))}
         </div>
