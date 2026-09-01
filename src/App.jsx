@@ -28,13 +28,13 @@ export default function App() {
   function addList(name) {
     const trimmed = name.trim();
 
-    if (!trimmed) return;
+    if (!trimmed) return false;
 
     const exists = lists.some(
       (list) => list.name.toLowerCase() === trimmed.toLowerCase(),
     );
 
-    if (exists) return;
+    if (exists) return false;
 
     const newList = {
       id: crypto.randomUUID(),
@@ -42,22 +42,22 @@ export default function App() {
     };
 
     setLists((prev) => [...prev, newList]);
-
-    // Open the newly created list immediately.
     setSelectedListId(newList.id);
+
+    return true;
   }
 
   function renameList(id, name) {
     const trimmed = name.trim();
 
-    if (!trimmed) return;
+    if (!trimmed) return false;
 
     const exists = lists.some(
       (list) =>
         list.id !== id && list.name.toLowerCase() === trimmed.toLowerCase(),
     );
 
-    if (exists) return;
+    if (exists) return false;
 
     setLists((prev) =>
       prev.map((list) =>
@@ -69,6 +69,8 @@ export default function App() {
           : list,
       ),
     );
+
+    return true;
   }
 
   function deleteList(id, deleteTasks = false) {

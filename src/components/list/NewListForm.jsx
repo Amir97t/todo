@@ -19,7 +19,11 @@ export default function NewListForm({ onSave }) {
 
     if (!value) return;
 
-    onSave(value);
+    const saved = onSave(value);
+
+    // Keep the form open when saving fails, for example
+    // when another list already has the same name.
+    if (!saved) return;
 
     setName("");
     setIsOpen(false);

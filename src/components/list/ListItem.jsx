@@ -30,8 +30,6 @@ export default function ListItem({
     if (!trimmed) return;
 
     onRename(list.id, trimmed);
-
-    onCancel();
   }
 
   function handleCancel() {

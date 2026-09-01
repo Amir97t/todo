@@ -25,7 +25,10 @@ export default function Sidebar({
   // App does not need to know whether the sidebar is visually open.
 
   function handleRename(id, name) {
-    renameList(id, name);
+    const renamed = renameList(id, name);
+
+    if (!renamed) return;
+
     setEditingId(null);
   }
 
@@ -57,11 +60,11 @@ export default function Sidebar({
   return (
     <>
       <aside
-        className={`flex h-screen flex-col border-r border-zinc-800 bg-zinc-900 transition-all duration-200 ${
+        className={`flex h-screen flex-col overflow-hidden border-r border-zinc-800 bg-zinc-900 transition-all duration-200 ${
           isCollapsed ? "w-16" : "w-64"
         }`}
       >
-        <div className="flex-1 overflow-hidden p-3">
+        <div className="min-h-0 flex-1 overflow-y-auto p-3">
           <div
             className={`mb-5 flex items-center ${
               isCollapsed ? "justify-center" : "justify-between"
@@ -98,7 +101,7 @@ export default function Sidebar({
           </div>
         </div>
 
-        <div className="border-t border-zinc-800 p-3">
+        <div className="shrink-0 border-t border-zinc-800 p-3">
           {isCollapsed ? (
             <Button
               type="button"
