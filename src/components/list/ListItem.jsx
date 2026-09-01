@@ -11,6 +11,7 @@ export default function ListItem({
   onRename,
   onCancel,
   onDelete,
+  collapsed,
 }) {
   const { value: name, setValue: setName, startEditing } = useInlineEditing();
 
@@ -45,6 +46,23 @@ export default function ListItem({
     if (e.key === "Escape") {
       handleCancel();
     }
+  }
+
+  if (collapsed) {
+    return (
+      <button
+        type="button"
+        title={list.name}
+        onClick={() => onSelect(list.id)}
+        className={`flex h-10 w-full items-center justify-center rounded-lg font-semibold transition ${
+          selected
+            ? "bg-blue-600 text-white"
+            : "text-zinc-400 hover:bg-zinc-800 hover:text-white"
+        }`}
+      >
+        {list.name.charAt(0).toUpperCase()}
+      </button>
+    );
   }
 
   return (
@@ -82,16 +100,13 @@ export default function ListItem({
       ) : (
         <div className="flex min-w-0 items-center gap-2">
           <button
+            type="button"
             className="min-w-0 flex-1 truncate text-left"
             onClick={() => onSelect(list.id)}
           >
             {list.name}
           </button>
-          {/* 
-    Inbox is a system list used as the default destination for tasks
-    when their original list is deleted.
-    Keep it stable so list deletion always has a valid fallback.
-  */}
+
           {list.id !== "inbox" && (
             <div className="flex shrink-0 gap-2">
               <Button

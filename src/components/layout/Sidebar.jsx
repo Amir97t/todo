@@ -2,6 +2,7 @@ import ListItem from "../list/ListItem";
 import NewListForm from "../list/NewListForm";
 import { useState } from "react";
 import ConfirmDialog from "../common/ConfirmDialog";
+import Button from "../ui/Button";
 
 export default function Sidebar({
   addList,
@@ -46,44 +47,72 @@ export default function Sidebar({
     deleteList(deleteTarget.id, true);
     setDeleteTarget(null);
   }
+  function handleNewListClick() {
+    // Expand the sidebar before showing the full list creation form.
+    if (isCollapsed) {
+      setIsCollapsed(false);
+    }
+  }
 
   return (
-    <aside
-      className={`flex h-screen flex-col border-r border-zinc-800 bg-zinc-900 transition-all duration-200 ${
-        isCollapsed ? "w-16" : "w-64"
-      }`}
-    >
-      <div className="flex-1 p-5">
-        <button
-          type="button"
-          className="mb-5 text-left text-zinc-400 hover:text-white"
-          onClick={() => setIsCollapsed((prev) => !prev)}
-        >
-          ☰
-        </button>
-        <h2 className="mb-5 text-lg font-bold">Lists</h2>
+    <>
+      <aside
+        className={`flex h-screen flex-col border-r border-zinc-800 bg-zinc-900 transition-all duration-200 ${
+          isCollapsed ? "w-16" : "w-64"
+        }`}
+      >
+        <div className="flex-1 overflow-hidden p-3">
+          <div
+            className={`mb-5 flex items-center ${
+              isCollapsed ? "justify-center" : "justify-between"
+            }`}
+          >
+            {!isCollapsed && (
+              <h2 className="text-lg font-bold text-white">Lists</h2>
+            )}
 
-        <div className="space-y-2">
-          {lists.map((list) => (
-            <ListItem
-              key={list.id}
-              list={list}
-              selected={selectedListId === list.id}
-              onSelect={onSelect}
-              editingId={editingId}
-              onStartEdit={setEditingId}
-              onRename={handleRename}
-              onCancel={() => setEditingId(null)}
-              onDelete={handleDeleteRequest}
-              collapsed={isCollapsed}
-            />
-          ))}
+            <button
+              type="button"
+              className="rounded p-2 text-zinc-400 hover:bg-zinc-800 hover:text-white"
+              onClick={() => setIsCollapsed((prev) => !prev)}
+            >
+              ☰
+            </button>
+          </div>
+
+          <div className="space-y-2">
+            {lists.map((list) => (
+              <ListItem
+                key={list.id}
+                list={list}
+                selected={selectedListId === list.id}
+                onSelect={onSelect}
+                editingId={editingId}
+                onStartEdit={setEditingId}
+                onRename={handleRename}
+                onCancel={() => setEditingId(null)}
+                onDelete={handleDeleteRequest}
+                collapsed={isCollapsed}
+              />
+            ))}
+          </div>
         </div>
-      </div>
 
-      <div className="border-t border-zinc-800 p-4">
-        <NewListForm onSave={addList} />
-      </div>
+        <div className="border-t border-zinc-800 p-3">
+          {isCollapsed ? (
+            <Button
+              type="button"
+              className="flex h-10 w-full items-center justify-center px-0"
+              onClick={handleNewListClick}
+              title="New List"
+            >
+              +
+            </Button>
+          ) : (
+            <NewListForm onSave={addList} />
+          )}
+        </div>
+      </aside>
 
       {deleteTarget && (
         <ConfirmDialog
@@ -97,6 +126,6 @@ export default function Sidebar({
           onSecondaryConfirm={handleDeleteListAndTasks}
         />
       )}
-    </aside>
+    </>
   );
 }
