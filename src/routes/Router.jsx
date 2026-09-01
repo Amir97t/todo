@@ -34,17 +34,7 @@ export default function Router({
 
         <Route
           path="/completed"
-          element={
-            <Completed
-              tasks={tasks}
-              taskActions={taskActions}
-              lists={lists}
-              selectedListId={selectedListId}
-              setSelectedListId={setSelectedListId}
-              addList={addList}
-              deleteList={deleteList}
-            />
-          }
+          element={<Completed tasks={tasks} taskActions={taskActions} />}
         />
       </Routes>
     </BrowserRouter>

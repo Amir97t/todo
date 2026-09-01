@@ -5,7 +5,7 @@ import Navbar from "../components/layout/Navbar";
 import useTaskFilter from "../hooks/useTaskFilter";
 import SearchBar from "../components/task/SearchBar";
 import TaskCounter from "../components/task/TaskCounter";
-import FilterBar from "../components/task/FIlterBar";
+import FilterBar from "../components/task/FilterBar";
 import EmptyState from "../components/common/EmptyState";
 import Sidebar from "../components/layout/Sidebar";
 
@@ -32,7 +32,9 @@ export default function Inbox({
     filter,
   });
 
-  const hasActiveTasks = tasks.some((task) => !task.completed);
+  const hasActiveTasks = tasks.some(
+    (task) => !task.completed && task.listId === selectedListId,
+  );
 
   function handleAddTask(title, description, checklist) {
     // Inbox supplies the active list context.
