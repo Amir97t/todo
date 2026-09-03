@@ -32,9 +32,9 @@ export default function Inbox({
     filter,
   });
 
-  const hasActiveTasks = tasks.some(
-    (task) => !task.completed && task.listId === selectedListId,
-  );
+  const hasActiveTasks = search.trim()
+    ? tasks.some((task) => !task.completed)
+    : tasks.some((task) => !task.completed && task.listId === selectedListId);
 
   function handleAddTask(title, description, checklist) {
     // Inbox supplies the active list context.

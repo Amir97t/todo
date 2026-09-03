@@ -12,7 +12,7 @@ export default function useTaskFilter({
 
     // Apply list filtering only when a list is explicitly selected.
     // This keeps Completed as a global view while Inbox can stay list-specific.
-    if (selectedListId) {
+    if (selectedListId && !search.trim()) {
       filtered = filtered.filter((task) => task.listId === selectedListId);
     }
 
