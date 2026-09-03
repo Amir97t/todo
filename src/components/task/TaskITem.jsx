@@ -12,7 +12,7 @@ export default function TaskItem({
   editingId,
   onStartEdit,
 }) {
-  const { toggleTask, editTask } = taskActions;
+  const { toggleTask, editTask, deleteTask } = taskActions;
 
   const {
     value: editValues,
@@ -200,7 +200,7 @@ export default function TaskItem({
         onCancel={() => setIsDeleteOpen(false)}
         onConfirm={() => {
           // Confirmation handles the UI decision; App performs the mutation.
-          taskActions.deleteTask(task.id);
+          deleteTask(task.id);
           setIsDeleteOpen(false);
         }}
       />
