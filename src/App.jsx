@@ -104,6 +104,8 @@ export default function App() {
 
     if (!trimmedTitle) return;
 
+    const listExists = lists.some((list) => list.id === listId);
+    if (!listExists) return;
     const newTask = {
       id: crypto.randomUUID(),
       title: trimmedTitle,
@@ -134,18 +136,26 @@ export default function App() {
     );
   }
 
-  function editTask(id, updatedTask) {
-    setTasks((prev) =>
-      prev.map((task) =>
-        task.id === id
-          ? {
-              ...task,
-              ...updatedTask,
-            }
-          : task,
-      ),
+function editTask(id, updatedTask) {
+  if (updatedTask.listId) {
+    const listExists = lists.some(
+      (list) => list.id === updatedTask.listId,
     );
+
+    if (!listExists) return;
   }
+
+  setTasks((prev) =>
+    prev.map((task) =>
+      task.id === id
+        ? {
+            ...task,
+            ...updatedTask,
+          }
+        : task,
+    ),
+  );
+}
 
   const taskActions = {
     addTask,
