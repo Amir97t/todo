@@ -13,7 +13,6 @@ export default function Router({
   deleteList,
 }) {
   return (
-    // <=====
     <BrowserRouter>
       <Routes>
         <Route
@@ -34,7 +33,18 @@ export default function Router({
 
         <Route
           path="/completed"
-          element={<Completed tasks={tasks} taskActions={taskActions} />}
+          element={
+            <Completed
+              tasks={tasks}
+              taskActions={taskActions}
+              lists={lists}
+              selectedListId={selectedListId}
+              setSelectedListId={setSelectedListId}
+              addList={addList}
+              renameList={renameList}
+              deleteList={deleteList}
+            />
+          }
         />
       </Routes>
     </BrowserRouter>
