@@ -1,1 +1,534 @@
 @import "tailwindcss";
+
+@font-face {
+  font-family: "Geist Variable";
+  src: url("@fontsource-variable/geist/files/geist-latin-wght-normal.woff2")
+    format("woff2");
+  font-display: swap;
+}
+
+/* ==========================================================================
+   FOUNDATION
+   ========================================================================== */
+
+:root {
+  --bg: #f8f6f0;
+  --bg-soft: #fdfbf7;
+  --bg-elevated: #ffffff;
+  --bg-muted: #f0ece2;
+
+  --text: #1a1a1e;
+  --text-muted: #6b7280;
+  --text-faint: #9ca3af;
+
+  --border: #e8e2d4;
+  --border-strong: #d6cfb8;
+
+  --primary: #c45a1a;
+  --primary-hover: #a94a14;
+  --primary-soft: #fef0e6;
+
+  --accent: #2a7a6b;
+
+  /* semantic aliases */
+  --page-bg: var(--bg);
+  --surface: var(--bg-soft);
+  --surface-elevated: var(--bg-elevated);
+  --surface-muted: var(--bg-muted);
+
+  --text-primary: var(--text);
+  --text-secondary: var(--text-muted);
+  --text-tertiary: var(--text-faint);
+
+  --border-default: var(--border);
+  --border-emphasis: var(--border-strong);
+
+  --color-primary: var(--primary);
+  --color-primary-hover: var(--primary-hover);
+  --color-primary-soft: var(--primary-soft);
+
+  --color-accent: var(--accent);
+
+  --success: #2f8f68;
+  --success-soft: #e8f6ef;
+
+  --danger: #c24141;
+  --danger-soft: #fceaea;
+
+  --warning: #b7791f;
+  --warning-soft: #fff4d6;
+
+  --card-shadow:
+    0 4px 24px rgba(60, 40, 10, 0.08),
+    0 1px 4px rgba(60, 40, 10, 0.06);
+
+  --card-shadow-hover:
+    0 8px 32px rgba(60, 40, 10, 0.12),
+    0 2px 8px rgba(60, 40, 10, 0.08);
+
+  --radius: 16px;
+  --radius-sm: 10px;
+  --radius-lg: 20px;
+
+  --notebook-wood: #3d2817;
+  --notebook-wood-light: #5a3d2a;
+  --notebook-wood-dark: #2a1c0f;
+  --notebook-paper: #fffef8;
+  --notebook-paper-line: rgba(180, 160, 120, 0.18);
+  --notebook-binding: #8a7a6a;
+
+  --sticky-yellow: #fef9c3;
+  --sticky-blue: #cffafe;
+  --sticky-pink: #ffe4e6;
+  --sticky-orange: #ffedd5;
+  --sticky-green: #dcfce7;
+  --sticky-purple: #f3e8ff;
+  --sticky-gray: #f3f4f6;
+  --sticky-yellow-dark: #fde047;
+
+  --sticky-shadow:
+    0 2px 8px rgba(0, 0, 0, 0.08),
+    0 1px 2px rgba(0, 0, 0, 0.06);
+}
+
+/* ==========================================================================
+   DARK THEME
+   ========================================================================== */
+
+:root.dark,
+[data-theme="dark"] {
+  --bg: #0f0f14;
+  --bg-soft: #18181f;
+  --bg-elevated: #1e1e26;
+  --bg-muted: #252530;
+
+  --text: #f0ede8;
+  --text-muted: #a0a0b2;
+  --text-faint: #6b6b7a;
+
+  --border: #2a2a36;
+  --border-strong: #353545;
+
+  --primary: #e07a2e;
+  --primary-hover: #f08a3a;
+  --primary-soft: #2a1f1a;
+
+  --accent: #3eb8a0;
+
+  /* semantic aliases */
+  --page-bg: var(--bg);
+  --surface: var(--bg-soft);
+  --surface-elevated: var(--bg-elevated);
+  --surface-muted: var(--bg-muted);
+
+  --text-primary: var(--text);
+  --text-secondary: var(--text-muted);
+  --text-tertiary: var(--text-faint);
+
+  --border-default: var(--border);
+  --border-emphasis: var(--border-strong);
+
+  --color-primary: var(--primary);
+  --color-primary-hover: var(--primary-hover);
+  --color-primary-soft: var(--primary-soft);
+
+  --color-accent: var(--accent);
+
+  --success: #4fb88c;
+  --success-soft: #17352a;
+
+  --danger: #df6868;
+  --danger-soft: #381d1d;
+
+  --warning: #d2a54a;
+  --warning-soft: #3a2e17;
+
+  --card-shadow:
+    0 4px 24px rgba(0, 0, 0, 0.4),
+    0 1px 4px rgba(0, 0, 0, 0.3);
+
+  --card-shadow-hover:
+    0 8px 32px rgba(0, 0, 0, 0.5),
+    0 2px 8px rgba(0, 0, 0, 0.4);
+
+  /* notebook tokens unchanged */
+  --notebook-wood: #2c1e12;
+  --notebook-wood-light: #3d2d1e;
+  --notebook-wood-dark: #1a120c;
+  --notebook-paper: #1e1c18;
+  --notebook-paper-line: rgba(255, 240, 200, 0.06);
+  --notebook-binding: #4a3d32;
+
+  --sticky-yellow: #3a3410;
+  --sticky-blue: #0f2a33;
+  --sticky-pink: #332025;
+  --sticky-orange: #331f14;
+  --sticky-green: #132a1a;
+  --sticky-purple: #221933;
+  --sticky-gray: #1e1e26;
+
+  --sticky-shadow:
+    0 4px 20px rgba(0, 0, 0, 0.4);
+}
+
+/* ==========================================================================
+   GLOBAL BASE
+   ========================================================================== */
+
+html {
+  scroll-behavior: smooth;
+  color-scheme: light;
+}
+
+html.dark,
+html[data-theme="dark"] {
+  color-scheme: dark;
+}
+
+*,
+*::before,
+*::after {
+  box-sizing: border-box;
+}
+
+* {
+  scrollbar-width: thin;
+}
+
+body {
+  min-height: 100dvh;
+  margin: 0;
+
+  font-family:
+    "Geist Variable",
+    system-ui,
+    -apple-system,
+    sans-serif;
+
+  background: var(--page-bg);
+  color: var(--text);
+
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+
+  overflow-x: hidden;
+}
+
+button,
+input,
+textarea,
+select {
+  font: inherit;
+}
+
+button {
+  color: inherit;
+}
+
+a {
+  color: inherit;
+}
+
+/* ==========================================================================
+   SELECTION
+   ========================================================================== */
+
+::selection {
+  background: var(--primary);
+  color: white;
+}
+
+/* ==========================================================================
+   SCROLLBAR
+   ========================================================================== */
+
+::-webkit-scrollbar {
+  width: 6px;
+  height: 6px;
+}
+
+::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+::-webkit-scrollbar-thumb {
+  background: var(--border-strong);
+  border-radius: var(--radius-full);
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: var(--text-faint);
+}
+
+/* ==========================================================================
+   ACCESSIBILITY
+   ========================================================================== */
+
+*:focus-visible {
+  outline: 2px solid var(--primary);
+  outline-offset: 2px;
+}
+
+/* ==========================================================================
+   PAPER & WOOD
+   ========================================================================== */
+
+.paper-texture {
+  background-color: var(--notebook-paper);
+
+  background-image:
+    linear-gradient(
+      var(--notebook-paper-line) 1px,
+      transparent 1px
+    ),
+    radial-gradient(
+      ellipse at 20% 50%,
+      rgba(200, 180, 140, 0.04) 0%,
+      transparent 50%
+    ),
+    radial-gradient(
+      ellipse at 80% 20%,
+      rgba(180, 160, 120, 0.03) 0%,
+      transparent 40%
+    );
+
+  background-size:
+    100% 28px,
+    100% 100%,
+    100% 100%;
+}
+
+.wood-texture {
+  background-color: var(--notebook-wood);
+
+  background-image:
+    repeating-linear-gradient(
+      90deg,
+      transparent 0px,
+      rgba(0, 0, 0, 0.04) 1px,
+      transparent 2px,
+      rgba(255, 255, 255, 0.03) 3px,
+      transparent 6px
+    ),
+    repeating-linear-gradient(
+      0deg,
+      rgba(0, 0, 0, 0.06) 0px,
+      transparent 8px,
+      rgba(255, 255, 255, 0.02) 16px,
+      transparent 24px
+    ),
+    linear-gradient(
+      180deg,
+      var(--notebook-wood-light) 0%,
+      var(--notebook-wood) 30%,
+      var(--notebook-wood-dark) 100%
+    );
+}
+
+/* ==========================================================================
+   ANIMATIONS
+   ========================================================================== */
+
+@keyframes float {
+  0%,
+  100% {
+    transform: translateY(0);
+  }
+
+  50% {
+    transform: translateY(-4px);
+  }
+}
+
+@keyframes shimmer {
+  0% {
+    opacity: 0.5;
+  }
+
+  50% {
+    opacity: 1;
+  }
+
+  100% {
+    opacity: 0.5;
+  }
+}
+
+@keyframes slideIn {
+  from {
+    opacity: 0;
+    transform: translateY(8px);
+  }
+
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.animate-slideIn {
+  animation: slideIn 0.4s ease-out both;
+}
+
+/* --------------------------------------------------------------------------
+   Dynamic island
+   -------------------------------------------------------------------------- */
+
+@keyframes islandIn {
+  from {
+    opacity: 0;
+    transform: translateY(-16px) scale(0.92);
+  }
+
+  to {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
+}
+
+@keyframes islandOut {
+  from {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
+
+  to {
+    opacity: 0;
+    transform: translateY(-16px) scale(0.92);
+  }
+}
+
+/* --------------------------------------------------------------------------
+   Pencil draw
+   -------------------------------------------------------------------------- */
+
+@keyframes pencilDraw {
+  from {
+    width: 0;
+  }
+
+  to {
+    width: 100%;
+  }
+}
+
+@keyframes pencilWiggle {
+  0%,
+  100% {
+    transform: rotate(-2deg);
+  }
+
+  50% {
+    transform: rotate(1deg);
+  }
+}
+
+/* ==========================================================================
+   UTILITY CLASSES
+   ========================================================================== */
+
+.no-scrollbar {
+  scrollbar-width: none;
+  -ms-overflow-style: none;
+}
+
+.no-scrollbar::-webkit-scrollbar {
+  display: none;
+}
+
+/* ==========================================================================
+   STICKY NOTES
+   ========================================================================== */
+
+.sticky-note {
+  transition:
+    transform 0.2s ease,
+    box-shadow 0.2s ease;
+}
+
+.sticky-note:hover {
+  transform: translateY(-3px) rotate(0.3deg);
+
+  box-shadow:
+    0 10px 28px rgba(0, 0, 0, 0.12),
+    0 2px 8px rgba(0, 0, 0, 0.08);
+}
+
+.dark .sticky-note:hover,
+[data-theme="dark"] .sticky-note:hover {
+  box-shadow:
+    0 12px 32px rgba(0, 0, 0, 0.45);
+}
+
+/* ==========================================================================
+   CHECKLIST
+   ========================================================================== */
+
+.checklist-text {
+  position: relative;
+  display: inline;
+}
+
+.checklist-text::after {
+  content: "";
+
+  position: absolute;
+  left: -1px;
+  right: -1px;
+  top: 52%;
+
+  height: 2px;
+
+  background: currentColor;
+  opacity: 0.85;
+
+  transform: scaleX(0);
+  transform-origin: left center;
+
+  border-radius: 1px;
+}
+
+.checklist-text.is-done::after {
+  animation:
+    pencilDraw 0.42s cubic-bezier(0.22, 1, 0.36, 1)
+    forwards;
+}
+
+/* ==========================================================================
+   STICKY ROTATIONS
+   ========================================================================== */
+
+.sticky-rotate-1 {
+  transform: rotate(-0.6deg);
+}
+
+.sticky-rotate-2 {
+  transform: rotate(0.7deg);
+}
+
+.sticky-rotate-3 {
+  transform: rotate(-0.4deg);
+}
+
+.sticky-rotate-0 {
+  transform: rotate(0.3deg);
+}
+
+/* ==========================================================================
+   REDUCED MOTION
+   ========================================================================== */
+
+@media (prefers-reduced-motion: reduce) {
+  html {
+    scroll-behavior: auto;
+  }
+
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
+  }
+}
