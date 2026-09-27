@@ -1,5 +1,6 @@
 import Router from "./routes/Router";
 import useLocalStorage from "./hooks/useLocalStorage";
+import { getSuggestedListIcon } from "./lib/listIcons";
 
 const LISTS_STORAGE_KEY = "todo-app-lists";
 const TASKS_STORAGE_KEY = "todo-app-tasks";
@@ -9,6 +10,7 @@ const DEFAULT_LISTS = [
   {
     id: "inbox",
     name: "Inbox",
+    icon: "inbox",
   },
 ];
 
@@ -25,7 +27,7 @@ export default function App() {
     "inbox",
   );
 
-  function addList(name) {
+  function addList(name, icon) {
     const trimmed = name.trim();
 
     if (!trimmed) return false;
@@ -39,6 +41,7 @@ export default function App() {
     const newList = {
       id: crypto.randomUUID(),
       name: trimmed,
+      icon: icon || getSuggestedListIcon(trimmed),
     };
 
     setLists((prev) => [...prev, newList]);
@@ -47,7 +50,7 @@ export default function App() {
     return true;
   }
 
-  function renameList(id, name) {
+  function renameList(id, name, icon) {
     const trimmed = name.trim();
 
     if (!trimmed) return false;
@@ -59,12 +62,13 @@ export default function App() {
 
     if (exists) return false;
 
-    setLists((prev) =>
-      prev.map((list) =>
+    setLists((currentLists) =>
+      currentLists.map((list) =>
         list.id === id
           ? {
               ...list,
               name: trimmed,
+              icon: icon ?? list.icon ?? getSuggestedListIcon(trimmed),
             }
           : list,
       ),
