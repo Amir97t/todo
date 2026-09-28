@@ -1,6 +1,7 @@
-import { useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
+import { Check, ChevronDown, Pencil, Plus, Trash2, X } from "lucide-react";
+
 import Input from "../ui/Input";
-import Button from "../ui/Button";
 
 export default function TaskChecklist({
   items,
@@ -13,6 +14,47 @@ export default function TaskChecklist({
   const [newText, setNewText] = useState("");
   const [editingId, setEditingId] = useState(null);
   const [editText, setEditText] = useState("");
+  const [scrollState, setScrollState] = useState({
+    canScroll: false,
+    atBottom: false,
+  });
+
+  const listRef = useRef(null);
+
+  const updateScrollState = useCallback(() => {
+    const element = listRef.current;
+
+    if (!element) return;
+
+    const canScroll = element.scrollHeight > element.clientHeight + 4;
+    const atBottom =
+      element.scrollTop + element.clientHeight >= element.scrollHeight - 4;
+
+    setScrollState((previous) => {
+      if (previous.canScroll === canScroll && previous.atBottom === atBottom) {
+        return previous;
+      }
+
+      return { canScroll, atBottom };
+    });
+  }, []);
+
+  useEffect(() => {
+    const frame = requestAnimationFrame(updateScrollState);
+
+    return () => cancelAnimationFrame(frame);
+  }, [items, updateScrollState]);
+
+  useEffect(() => {
+    const element = listRef.current;
+
+    if (!element) return;
+
+    const observer = new ResizeObserver(updateScrollState);
+    observer.observe(element);
+
+    return () => observer.disconnect();
+  }, [updateScrollState]);
 
   function handleAdd() {
     const text = newText.trim();
@@ -20,14 +62,11 @@ export default function TaskChecklist({
     if (!text) return;
 
     onAdd(text);
-
     setNewText("");
     setIsAdding(false);
   }
 
   function handleStartEdit(item) {
-    // Editing state belongs to the checklist item UI.
-    // TaskItem only owns the task-level data.
     setEditingId(item.id);
     setEditText(item.text);
   }
@@ -35,10 +74,9 @@ export default function TaskChecklist({
   function handleSaveEdit() {
     const text = editText.trim();
 
-    if (!text) return;
+    if (!text || !editingId) return;
 
     onEdit(editingId, text);
-
     setEditingId(null);
     setEditText("");
   }
@@ -48,128 +86,220 @@ export default function TaskChecklist({
     setEditText("");
   }
 
-  function handleKeyDown(e) {
-    if (e.key === "Enter") {
-      e.preventDefault();
+  function handleEditKeyDown(event) {
+    if (event.key === "Enter") {
+      event.preventDefault();
       handleSaveEdit();
     }
 
-    if (e.key === "Escape") {
+    if (event.key === "Escape") {
       handleCancelEdit();
     }
   }
 
+  function handleAddKeyDown(event) {
+    if (event.key === "Enter") {
+      event.preventDefault();
+      handleAdd();
+    }
+
+    if (event.key === "Escape") {
+      setNewText("");
+      setIsAdding(false);
+    }
+  }
+
+  function scrollToBottom() {
+    listRef.current?.scrollTo({
+      top: listRef.current.scrollHeight,
+      behavior: "smooth",
+    });
+  }
+
   return (
-    <div className="mt-3 space-y-2">
-      <div className="max-h-40 space-y-1 overflow-y-auto">
-        {items.map((item) => (
-          <div key={item.id} className="flex items-center gap-2">
-            <input
-              type="checkbox"
-              checked={item.completed}
-              onChange={() => onToggle(item.id)}
-            />
+    <div className="flex min-h-0 flex-1 flex-col gap-1.5">
+      <div className="relative min-h-0 flex-1">
+        <div
+          ref={listRef}
+          onScroll={updateScrollState}
+          className="no-scrollbar max-h-37 space-y-1 overflow-y-auto pr-1"
+        >
+          {items.map((item) => {
+            const isEditing = editingId === item.id;
 
-            {editingId === item.id ? (
-              <>
-                <Input
-                  autoFocus
-                  value={editText}
-                  onChange={(e) => setEditText(e.target.value)}
-                  onKeyDown={handleKeyDown}
-                  className="min-w-0 flex-1"
-                />
-
-                <Button type="button" onClick={handleSaveEdit}>
-                  Save
-                </Button>
-
-                <Button
+            return (
+              <div key={item.id} className="flex gap-2">
+                <button
                   type="button"
-                  className="bg-zinc-700 hover:bg-zinc-600"
-                  onClick={handleCancelEdit}
-                >
-                  Cancel
-                </Button>
-              </>
-            ) : (
-              <>
-                <span
-                  className={`min-w-0 flex-1 text-sm ${
+                  onClick={() => onToggle(item.id)}
+                  aria-pressed={item.completed}
+                  aria-label={
                     item.completed
-                      ? "text-zinc-500 line-through"
-                      : "text-zinc-300"
-                  }`}
+                      ? `Mark "${item.text}" incomplete`
+                      : `Mark "${item.text}" complete`
+                  }
+                  className="mt-0.5 flex h-4.5 w-4.5 shrink-0 items-center justify-center rounded-[5px] border bg-(--bg-elevated) transition-[background-color,border-color,box-shadow] hover:brightness-105 focus-visible:ring-2 focus-visible:ring-(--primary)/30"
+                  style={{
+                    borderColor: item.completed
+                      ? "var(--primary)"
+                      : "var(--border-strong)",
+                    background: item.completed
+                      ? "var(--primary)"
+                      : "var(--bg-elevated)",
+                    color: "white",
+                  }}
                 >
-                  {item.text}
-                </span>
-
-                <button
-                  type="button"
-                  className="text-xs text-zinc-500 hover:text-zinc-300"
-                  onClick={() => handleStartEdit(item)}
-                >
-                  Edit
+                  {item.completed && (
+                    <Check size={10} strokeWidth={3} aria-hidden="true" />
+                  )}
                 </button>
 
-                <button
-                  type="button"
-                  className="text-xs text-red-400 hover:text-red-300"
-                  onClick={() => onDelete(item.id)}
-                >
-                  Delete
-                </button>
-              </>
-            )}
-          </div>
-        ))}
+                {isEditing ? (
+                  <div className="flex min-w-0 flex-1 gap-1">
+                    <Input
+                      autoFocus
+                      value={editText}
+                      onChange={(event) => setEditText(event.target.value)}
+                      onKeyDown={handleEditKeyDown}
+                      aria-label={`Edit "${item.text}"`}
+                      className="h-7 min-w-0 flex-1 px-2 text-xs"
+                    />
+
+                    <button
+                      type="button"
+                      onClick={handleSaveEdit}
+                      aria-label="Save checklist item"
+                      className="inline-flex h-7 w-7 shrink-0 items-center justify-center rounded-lg bg-(--primary) text-white transition-[filter] hover:brightness-105 focus-visible:ring-2 focus-visible:ring-(--primary)/30"
+                    >
+                      <Check size={11} aria-hidden="true" />
+                    </button>
+
+                    <button
+                      type="button"
+                      onClick={handleCancelEdit}
+                      aria-label="Cancel editing"
+                      className="inline-flex h-7 w-7 shrink-0 items-center justify-center rounded-lg border bg-(--bg-elevated) text-(--text-muted) transition-colors hover:text-(--text)"
+                      style={{ borderColor: "var(--border)" }}
+                    >
+                      <X size={11} aria-hidden="true" />
+                    </button>
+                  </div>
+                ) : (
+                  <div className="flex min-w-0 flex-1 gap-1">
+                    <span className="min-w-0 flex-1 wrap-break-word text-[13px] leading-4.5">
+                      <span
+                        className={`checklist-text ${
+                          item.completed ? "is-done" : ""
+                        }`}
+                        style={{
+                          color: item.completed
+                            ? "var(--text-faint)"
+                            : "var(--text)",
+                        }}
+                      >
+                        {item.text}
+                      </span>
+
+                      {item.completed && (
+                        <span
+                          aria-hidden="true"
+                          className="ml-1 inline-flex align-middle"
+                          style={{
+                            animation: "pencilWiggle 0.35s ease",
+                            color: "var(--text-faint)",
+                          }}
+                        >
+                          <Pencil size={10} />
+                        </span>
+                      )}
+                    </span>
+
+                    <div className="flex shrink-0 gap-0.5 self-start">
+                      <button
+                        type="button"
+                        onClick={() => handleStartEdit(item)}
+                        aria-label={`Edit "${item.text}"`}
+                        className="inline-flex h-6 w-6 items-center justify-center rounded-md text-(--text-faint) transition-colors hover:bg-(--bg-elevated) hover:text-(--text)"
+                      >
+                        <Pencil size={10} aria-hidden="true" />
+                      </button>
+
+                      <button
+                        type="button"
+                        onClick={() => onDelete(item.id)}
+                        aria-label={`Delete "${item.text}"`}
+                        className="inline-flex h-6 w-6 items-center justify-center rounded-md text-(--text-faint) transition-colors hover:bg-red-500/10 hover:text-red-500"
+                      >
+                        <Trash2 size={10} aria-hidden="true" />
+                      </button>
+                    </div>
+                  </div>
+                )}
+              </div>
+            );
+          })}
+        </div>
+
+        {scrollState.canScroll && !scrollState.atBottom && (
+          <button
+            type="button"
+            onClick={scrollToBottom}
+            aria-label="Scroll to see more checklist items"
+            className="absolute bottom-0 left-1/2 flex h-7 w-7 -translate-x-1/2 items-center justify-center rounded-full border bg-(--bg-elevated) shadow-md backdrop-blur transition-[background-color,box-shadow] hover:shadow-lg focus-visible:ring-2 focus-visible:ring-(--primary)/30"
+            style={{
+              borderColor: "var(--border)",
+              color: "var(--text-muted)",
+            }}
+          >
+            <ChevronDown size={14} aria-hidden="true" />
+          </button>
+        )}
       </div>
 
       {isAdding ? (
-        <div className="space-y-2">
+        <div className="flex gap-1.5 pt-1">
           <Input
             autoFocus
             value={newText}
-            placeholder="Checklist item..."
-            onChange={(e) => setNewText(e.target.value)}
-            onKeyDown={(e) => {
-              if (e.key === "Enter") {
-                e.preventDefault();
-                handleAdd();
-              }
-
-              if (e.key === "Escape") {
-                setNewText("");
-                setIsAdding(false);
-              }
-            }}
+            placeholder="New item..."
+            onChange={(event) => setNewText(event.target.value)}
+            onKeyDown={handleAddKeyDown}
+            aria-label="New checklist item"
+            className="h-7 min-w-0 flex-1 px-2 text-xs"
           />
 
-          <div className="flex gap-2">
-            <Button type="button" onClick={handleAdd}>
-              Add Item
-            </Button>
+          <button
+            type="button"
+            onClick={handleAdd}
+            aria-label="Add checklist item"
+            className="inline-flex h-7 w-7 shrink-0 items-center justify-center rounded-lg bg-(--primary) text-white transition-[filter] hover:brightness-105 focus-visible:ring-2 focus-visible:ring-(--primary)/30"
+          >
+            <Check size={11} aria-hidden="true" />
+          </button>
 
-            <Button
-              type="button"
-              className="bg-zinc-700 hover:bg-zinc-600"
-              onClick={() => {
-                setNewText("");
-                setIsAdding(false);
-              }}
-            >
-              Cancel
-            </Button>
-          </div>
+          <button
+            type="button"
+            onClick={() => {
+              setNewText("");
+              setIsAdding(false);
+            }}
+            aria-label="Cancel adding checklist item"
+            className="inline-flex h-7 w-7 shrink-0 items-center justify-center rounded-lg border bg-(--bg-elevated) text-(--text-muted) transition-colors hover:text-(--text)"
+            style={{ borderColor: "var(--border)" }}
+          >
+            <X size={11} aria-hidden="true" />
+          </button>
         </div>
       ) : (
-        <Button
+        <button
           type="button"
-          className="bg-zinc-800 hover:bg-zinc-700"
           onClick={() => setIsAdding(true)}
+          className="inline-flex items-center gap-1 self-start rounded-full border bg-(--bg-elevated) px-2.5 py-1 text-xs font-medium text-(--text-muted) transition-colors hover:text-(--text)"
+          style={{ borderColor: "var(--border)" }}
         >
-          + Add Item
-        </Button>
+          <Plus size={11} aria-hidden="true" />
+          Add
+        </button>
       )}
     </div>
   );
