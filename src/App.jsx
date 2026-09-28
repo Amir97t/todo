@@ -1,5 +1,6 @@
 import Router from "./routes/Router";
 import useLocalStorage from "./hooks/useLocalStorage";
+import CelestialBackground from "./components/common/CelestialBackground";
 import { getSuggestedListIcon } from "./lib/listIcons";
 
 const LISTS_STORAGE_KEY = "todo-app-lists";
@@ -140,26 +141,24 @@ export default function App() {
     );
   }
 
-function editTask(id, updatedTask) {
-  if (updatedTask.listId) {
-    const listExists = lists.some(
-      (list) => list.id === updatedTask.listId,
+  function editTask(id, updatedTask) {
+    if (updatedTask.listId) {
+      const listExists = lists.some((list) => list.id === updatedTask.listId);
+
+      if (!listExists) return;
+    }
+
+    setTasks((prev) =>
+      prev.map((task) =>
+        task.id === id
+          ? {
+              ...task,
+              ...updatedTask,
+            }
+          : task,
+      ),
     );
-
-    if (!listExists) return;
   }
-
-  setTasks((prev) =>
-    prev.map((task) =>
-      task.id === id
-        ? {
-            ...task,
-            ...updatedTask,
-          }
-        : task,
-    ),
-  );
-}
 
   const taskActions = {
     addTask,
@@ -169,15 +168,18 @@ function editTask(id, updatedTask) {
   };
 
   return (
-    <Router
-      tasks={tasks}
-      taskActions={taskActions}
-      lists={lists}
-      addList={addList}
-      renameList={renameList}
-      deleteList={deleteList}
-      selectedListId={selectedListId}
-      setSelectedListId={setSelectedListId}
-    />
+    <>
+      <CelestialBackground />
+      <Router
+        tasks={tasks}
+        taskActions={taskActions}
+        lists={lists}
+        addList={addList}
+        renameList={renameList}
+        deleteList={deleteList}
+        selectedListId={selectedListId}
+        setSelectedListId={setSelectedListId}
+      />
+    </>
   );
 }
