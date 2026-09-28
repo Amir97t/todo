@@ -1,15 +1,21 @@
+import { forwardRef } from "react";
 import { cn } from "../../lib/utils";
 
-export default function Input({ className, ...props }) {
+const Input = forwardRef(function Input({ className = "", ...props }, ref) {
   return (
     <input
+      ref={ref}
       className={cn(
-        "flex h-11 w-full rounded-lg border border-zinc-700 bg-zinc-950 px-3 text-sm text-white outline-none transition",
-        "placeholder:text-zinc-500",
-        "focus:border-blue-500",
+        "flex h-11 w-full rounded-xl border px-3.5 text-sm outline-hidden",
+        "border-(--border) bg-(--bg-elevated) text-(--text)",
+        "placeholder:text-(--text-faint)",
+        "transition-[border-color,box-shadow]",
+        "focus:border-(--primary) focus:ring-2 focus:ring-(--primary)/20",
         className,
       )}
       {...props}
     />
   );
-}
+});
+
+export default Input;
