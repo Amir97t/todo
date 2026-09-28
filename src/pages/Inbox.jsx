@@ -1,9 +1,9 @@
 import { useState } from "react";
 import AddTaskCard from "../components/task/AddTaskCard";
+import AddTaskFab from "../components/task/AddTaskFab";
 import TaskList from "../components/task/TaskList";
 import Navbar from "../components/layout/Navbar";
 import useTaskFilter from "../hooks/useTaskFilter";
-import SearchBar from "../components/task/SearchBar";
 import TaskCounter from "../components/task/TaskCounter";
 import FilterBar from "../components/task/FilterBar";
 import EmptyState from "../components/common/EmptyState";
@@ -20,8 +20,8 @@ export default function Inbox({
   deleteList,
 }) {
   const [editingId, setEditingId] = useState(null);
+  const [islandOpen, setIslandOpen] = useState(false);
   const { addTask } = taskActions;
-
   const [search, setSearch] = useState("");
   const [filter, setFilter] = useState("newest");
   const activeTasks = useTaskFilter({
@@ -31,19 +31,16 @@ export default function Inbox({
     search,
     filter,
   });
-
   const hasActiveTasks = search.trim()
-    ? tasks.some((task) => !task.completed)
-    : tasks.some((task) => !task.completed && task.listId === selectedListId);
-
+    ? tasks.some((t) => !t.completed)
+    : tasks.some((t) => !t.completed && t.listId === selectedListId);
   function handleAddTask(title, description, checklist) {
-    // Inbox supplies the active list context.
-    // AddTaskCard only manages task form data.
     addTask(title, description, checklist, selectedListId);
   }
-
+  const selectedListName =
+    lists.find((l) => l.id === selectedListId)?.name ?? "Inbox";
   return (
-    <main className="flex min-h-screen bg-zinc-950 text-white">
+    <div className="flex min-h-screen">
       <Sidebar
         lists={lists}
         selectedListId={selectedListId}
@@ -52,42 +49,67 @@ export default function Inbox({
         renameList={renameList}
         deleteList={deleteList}
       />
-      <div className="flex-1 p-8">
-        <div className="mx-auto max-w-4xl">
-          <Navbar />
-          <h1 className="mb-2 text-center text-4xl font-bold">Todo List</h1>
-          <p className="mb-8 text-center text-zinc-400">
-            Focus on your active tasks.
-          </p>
-
-          <AddTaskCard onAddTask={handleAddTask} />
-          <div className="mt-8">
-            <SearchBar value={search} onChange={setSearch} />
-            <div className="mb-4 flex items-center justify-between gap-4">
-              <TaskCounter total={activeTasks.length} label="Active" />
-              <FilterBar filter={filter} onChange={setFilter} />
+      <main className="min-h-screen flex-1">
+        <div className="w-full px-4 pb-10 pt-16 sm:px-6 sm:pt-8 lg:px-8 lg:pt-8">
+          <div className="max-w-350 mx-auto">
+            <Navbar
+              searchValue={search}
+              onSearchChange={setSearch}
+              onNewTask={() => setIslandOpen(true)}
+            />
+            <header className="mb-6 text-center sm:mb-8">
+              <h1
+                className="text-2xl font-extrabold tracking-tight sm:text-3xl lg:text-4xl"
+                style={{ color: "var(--text)" }}
+              >
+                {selectedListName}
+              </h1>
+              <p
+                className="mx-auto mt-2 max-w-xl text-sm leading-relaxed sm:text-[15px]"
+                style={{ color: "var(--text-muted)" }}
+              >
+                {search.trim()
+                  ? `Showing results for "${search.trim()}"`
+                  : `Focus on your active tasks in ${selectedListName}.`}
+              </p>
+            </header>
+            <div className="space-y-6">
+              <AddTaskCard
+                onAddTask={handleAddTask}
+                open={islandOpen}
+                onOpenChange={setIslandOpen}
+              />
+              <div className="space-y-4">
+                <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+                  <TaskCounter total={activeTasks.length} label="Active" />
+                  <FilterBar filter={filter} onChange={setFilter} />
+                </div>
+                {activeTasks.length === 0 ? (
+                  <EmptyState
+                    title={
+                      hasActiveTasks ? "No matching tasks" : "No active tasks"
+                    }
+                    description={
+                      hasActiveTasks
+                        ? "Try another search keyword or clear the search."
+                        : "Create your first task — it will appear on this paper."
+                    }
+                  />
+                ) : (
+                  <TaskList
+                    title="Active Tasks"
+                    tasks={activeTasks}
+                    taskActions={taskActions}
+                    editingId={editingId}
+                    onStartEdit={setEditingId}
+                  />
+                )}
+              </div>
             </div>
-            {activeTasks.length === 0 ? (
-              <EmptyState
-                title={hasActiveTasks ? "No matching tasks" : "No active tasks"}
-                description={
-                  hasActiveTasks
-                    ? "Try another search keyword."
-                    : "Create your first task."
-                }
-              />
-            ) : (
-              <TaskList
-                title="Active Tasks"
-                tasks={activeTasks}
-                taskActions={taskActions}
-                editingId={editingId}
-                onStartEdit={setEditingId}
-              />
-            )}
           </div>
         </div>
-      </div>
-    </main>
+        <AddTaskFab onClick={() => setIslandOpen(true)} />
+      </main>
+    </div>
   );
 }
