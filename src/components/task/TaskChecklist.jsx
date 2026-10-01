@@ -112,17 +112,17 @@ export default function TaskChecklist({
   function scrollToBottom() {
     listRef.current?.scrollTo({
       top: listRef.current.scrollHeight,
-      behavior: "smooth",
+      behavior: "auto",
     });
   }
 
   return (
     <div className="flex min-h-0 flex-1 flex-col gap-1.5">
-      <div className="relative min-h-0 flex-1">
+      <div className="relative min-h-32 flex-1">
         <div
           ref={listRef}
           onScroll={updateScrollState}
-          className="no-scrollbar max-h-37 space-y-1 overflow-y-auto pr-1"
+          className="no-scrollbar absolute inset-x-0 top-0 bottom-7 space-y-1.5 overflow-y-auto overscroll-contain pr-1"
         >
           {items.map((item) => {
             const isEditing = editingId === item.id;
@@ -138,7 +138,7 @@ export default function TaskChecklist({
                       ? `Mark "${item.text}" incomplete`
                       : `Mark "${item.text}" complete`
                   }
-                  className="mt-0.5 flex h-4.5 w-4.5 shrink-0 items-center justify-center rounded-[5px] border bg-(--bg-elevated) transition-[background-color,border-color,box-shadow] hover:brightness-105 focus-visible:ring-2 focus-visible:ring-(--primary)/30"
+                  className="mt-0.5 flex h-5 w-5 shrink-0 items-center justify-center rounded-[5px] border bg-(--bg-elevated) transition-[background-color,border-color,box-shadow] hover:brightness-105 focus-visible:ring-2 focus-visible:ring-(--primary)/30 sm:h-4.5 sm:w-4.5"
                   style={{
                     borderColor: item.completed
                       ? "var(--primary)"
@@ -219,7 +219,7 @@ export default function TaskChecklist({
                         type="button"
                         onClick={() => handleStartEdit(item)}
                         aria-label={`Edit "${item.text}"`}
-                        className="inline-flex h-6 w-6 items-center justify-center rounded-md text-(--text-faint) transition-colors hover:bg-(--bg-elevated) hover:text-(--text)"
+                        className="inline-flex h-7 w-7 items-center justify-center rounded-md text-(--text-faint) transition-colors hover:bg-(--bg-elevated) hover:text-(--text)"
                       >
                         <Pencil size={10} aria-hidden="true" />
                       </button>
@@ -228,7 +228,7 @@ export default function TaskChecklist({
                         type="button"
                         onClick={() => onDelete(item.id)}
                         aria-label={`Delete "${item.text}"`}
-                        className="inline-flex h-6 w-6 items-center justify-center rounded-md text-(--text-faint) transition-colors hover:bg-red-500/10 hover:text-red-500"
+                        className="inline-flex h-7 w-7 items-center justify-center rounded-md text-(--text-faint) transition-colors hover:bg-red-500/10 hover:text-red-500"
                       >
                         <Trash2 size={10} aria-hidden="true" />
                       </button>
@@ -241,18 +241,26 @@ export default function TaskChecklist({
         </div>
 
         {scrollState.canScroll && !scrollState.atBottom && (
-          <button
-            type="button"
-            onClick={scrollToBottom}
-            aria-label="Scroll to see more checklist items"
-            className="absolute bottom-0 left-1/2 flex h-7 w-7 -translate-x-1/2 items-center justify-center rounded-full border bg-(--bg-elevated) shadow-md backdrop-blur transition-[background-color,box-shadow] hover:shadow-lg focus-visible:ring-2 focus-visible:ring-(--primary)/30"
-            style={{
-              borderColor: "var(--border)",
-              color: "var(--text-muted)",
-            }}
-          >
-            <ChevronDown size={14} aria-hidden="true" />
-          </button>
+          <>
+            <div
+              aria-hidden="true"
+              className="pointer-events-none absolute inset-x-0 bottom-7 h-9 bg-gradient-to-t from-black/12 to-transparent"
+            />
+
+            <button
+              type="button"
+              onClick={scrollToBottom}
+              aria-label="Scroll to see more checklist items"
+              title="More checklist items below"
+              className="absolute bottom-0 left-1/2 flex h-7 w-7 -translate-x-1/2 items-center justify-center rounded-full border bg-(--bg-elevated) shadow-md backdrop-blur transition-[background-color,box-shadow] hover:shadow-lg focus-visible:ring-2 focus-visible:ring-(--primary)/30"
+              style={{
+                borderColor: "var(--border)",
+                color: "var(--text-muted)",
+              }}
+            >
+              <ChevronDown size={15} aria-hidden="true" />
+            </button>
+          </>
         )}
       </div>
 
@@ -294,11 +302,12 @@ export default function TaskChecklist({
         <button
           type="button"
           onClick={() => setIsAdding(true)}
-          className="inline-flex items-center gap-1 self-start rounded-full border bg-(--bg-elevated) px-2.5 py-1 text-xs font-medium text-(--text-muted) transition-colors hover:text-(--text)"
+          aria-label="Add checklist item"
+          title="Add checklist item"
+          className="inline-flex h-8 w-8 shrink-0 items-center justify-center self-start rounded-full border bg-(--bg-elevated) text-(--text-muted) transition-colors hover:text-(--text) focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-(--primary)"
           style={{ borderColor: "var(--border)" }}
         >
-          <Plus size={11} aria-hidden="true" />
-          Add
+          <Plus size={15} strokeWidth={2.5} aria-hidden="true" />
         </button>
       )}
     </div>

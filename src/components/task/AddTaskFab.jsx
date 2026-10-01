@@ -1,4 +1,4 @@
-import { Plus, Pencil } from "lucide-react";
+import { Pencil } from "lucide-react";
 
 export default function AddTaskFab({ onClick }) {
   return (
@@ -6,21 +6,17 @@ export default function AddTaskFab({ onClick }) {
       type="button"
       onClick={onClick}
       aria-label="Add new task"
-      className="fixed bottom-5 right-5 z-40 flex h-12 w-12 items-center justify-center rounded-full shadow-lg transition hover:scale-105 active:scale-95"
+      title="Add new task"
+      className="fixed z-40 flex h-13 w-13 items-center justify-center rounded-full shadow-lg transition hover:scale-105 active:scale-95 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-(--primary)"
       style={{
+        right: "max(1rem, env(safe-area-inset-right))",
+        bottom: "max(1rem, env(safe-area-inset-bottom))",
         background: "var(--primary)",
         color: "white",
         boxShadow: "0 8px 24px rgba(0,0,0,0.25)",
       }}
     >
-      <span className="relative flex h-6 w-6 items-center justify-center">
-        <Pencil size={18} strokeWidth={2.2} />
-        <Plus
-          size={12}
-          strokeWidth={3}
-          className="absolute -top-1 -right-1"
-        />
-      </span>
+      <Pencil size={20} strokeWidth={2.2} aria-hidden="true" />
     </button>
   );
 }

@@ -135,7 +135,7 @@ export default function TaskItem({
     return (
       <Card
         variant="sticky"
-        className={`flex min-h-65 flex-col p-4 ${rotation}`}
+        className={`flex min-h-56 flex-col p-3 sm:p-4 lg:min-h-65 ${rotation}`}
         style={{ background }}
       >
         <div className="space-y-3">
@@ -192,7 +192,7 @@ export default function TaskItem({
   return (
     <Card
       variant="sticky"
-      className={`group relative flex h-80 flex-col overflow-hidden p-4 ${rotation}`}
+      className={`group relative flex min-h-60 min-w-0 flex-col overflow-hidden p-3 sm:p-4 lg:min-h-80 ${rotation}`}
       style={{ background }}
     >
       <span
@@ -245,13 +245,13 @@ export default function TaskItem({
           {task.title}
         </h3>
 
-        <div className="hidden shrink-0 gap-1 sm:flex sm:opacity-0 sm:transition-opacity sm:group-hover:opacity-100 sm:group-focus-within:opacity-100">
+        <div className="flex shrink-0 gap-1">
           <button
             type="button"
             onClick={handleStartEdit}
-            aria-label={`Edit "${task.title}"`}
-            className="inline-flex h-7 w-7 items-center justify-center rounded-lg border bg-white/80 text-zinc-600 shadow-sm transition-[background-color,box-shadow] hover:bg-white hover:shadow focus-visible:outline-none"
-            style={{ borderColor: "var(--border)" }}
+            aria-label="Edit task"
+            title="Edit task"
+            className="inline-flex h-7 w-7 items-center justify-center rounded-lg border border-(--border) bg-(--bg-elevated) text-(--text) shadow-sm transition-[background-color,box-shadow,color] hover:bg-(--bg-muted) hover:shadow focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-(--primary)"
           >
             <Pencil size={11} aria-hidden="true" />
           </button>
@@ -259,9 +259,9 @@ export default function TaskItem({
           <button
             type="button"
             onClick={() => setIsDeleteOpen(true)}
-            aria-label={`Delete "${task.title}"`}
-            className="inline-flex h-7 w-7 items-center justify-center rounded-lg border bg-white/80 text-red-500 shadow-sm transition-[background-color,box-shadow] hover:bg-white hover:shadow focus-visible:outline-none"
-            style={{ borderColor: "var(--border)" }}
+            aria-label="Delete task"
+            title="Delete task"
+            className="inline-flex h-7 w-7 items-center justify-center rounded-lg border border-(--border) bg-(--bg-elevated) text-(--danger) shadow-sm transition-[background-color,box-shadow,color] hover:bg-(--danger-soft) hover:shadow focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-(--primary)"
           >
             <Trash2 size={11} aria-hidden="true" />
           </button>
@@ -270,7 +270,7 @@ export default function TaskItem({
 
       {task.description && (
         <p
-          className="mt-2 line-clamp-3 wrap-break-word text-sm leading-relaxed"
+          className="mt-2 min-w-0 line-clamp-3 wrap-break-word text-sm leading-relaxed"
           style={{ color: "var(--text-muted)" }}
         >
           {task.description}
@@ -309,28 +309,6 @@ export default function TaskItem({
           onDelete={handleDeleteChecklistItem}
           onEdit={handleEditChecklistItem}
         />
-      </div>
-
-      <div className="mt-3 flex gap-2 sm:hidden">
-        <Button
-          type="button"
-          variant="ghost"
-          onClick={handleStartEdit}
-          className="h-7 flex-1 gap-1 text-xs"
-        >
-          <Pencil size={11} aria-hidden="true" />
-          Edit
-        </Button>
-
-        <Button
-          type="button"
-          variant="danger"
-          onClick={() => setIsDeleteOpen(true)}
-          className="h-7 flex-1 gap-1 text-xs"
-        >
-          <Trash2 size={11} aria-hidden="true" />
-          Delete
-        </Button>
       </div>
 
       <ConfirmDialog
