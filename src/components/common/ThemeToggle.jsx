@@ -4,64 +4,42 @@ import useTheme from "../../context/useTheme";
 export default function ThemeToggle({ className = "" }) {
   const { theme, toggle } = useTheme();
   const isDark = theme === "dark";
+  const label = isDark ? "Switch to light mode" : "Switch to dark mode";
 
   return (
     <button
       type="button"
       onClick={toggle}
-      aria-label={isDark ? "Switch to light mode" : "Switch to dark mode"}
-      className={`relative inline-flex h-9 w-16 items-center rounded-full border p-1 transition-colors duration-300 ${className}`}
+      aria-label={label}
+      title={label}
+      className={`relative inline-flex h-9 w-9 shrink-0 items-center justify-center overflow-hidden rounded-xl border transition-[background-color,border-color,filter] duration-300 hover:brightness-105 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-(--primary) ${className}`}
       style={{
         background: "var(--bg-muted)",
         borderColor: "var(--border)",
       }}
     >
-      <span
-        aria-hidden="true"
-        className="pointer-events-none absolute inset-0 rounded-full opacity-60 transition-opacity duration-300"
-        style={{
-          background: isDark
-            ? "radial-gradient(ellipse at 70% 30%, color-mix(in srgb, var(--accent) 18%, transparent), transparent 60%)"
-            : "radial-gradient(ellipse at 30% 20%, color-mix(in srgb, var(--primary) 20%, transparent), transparent 60%)",
-        }}
-      />
+      {/* Odometer: a fixed-height window holding both icons stacked vertically. */}
+      <span aria-hidden="true" className="absolute inset-0 block overflow-hidden">
+        <span
+          className="block transition-transform duration-300 ease-[cubic-bezier(0.16,1,0.3,1)] motion-reduce:transition-none"
+          style={{
+            transform: isDark ? "translateY(-36px)" : "translateY(0px)",
+          }}
+        >
+          <span
+            className="flex h-9 w-9 items-center justify-center"
+            style={{ color: "var(--primary)" }}
+          >
+            <Sun size={16} strokeWidth={2.2} />
+          </span>
 
-      <span
-        aria-hidden="true"
-        className={`relative z-10 flex h-7 w-7 items-center justify-center rounded-full shadow-md transition-transform duration-300 ${
-          isDark ? "translate-x-7" : "translate-x-0"
-        }`}
-        style={{
-          background: "var(--bg-elevated)",
-          color: isDark ? "var(--accent)" : "var(--primary)",
-        }}
-      >
-        {isDark ? (
-          <Moon size={14} strokeWidth={2.2} />
-        ) : (
-          <Sun size={15} strokeWidth={2.2} />
-        )}
-      </span>
-
-      <span
-        aria-hidden="true"
-        className="pointer-events-none absolute inset-0 flex items-center justify-between px-2"
-      >
-        <Sun
-          size={10}
-          className={`transition-opacity duration-300 ${
-            isDark ? "opacity-20" : "opacity-50"
-          }`}
-          style={{ color: "var(--primary)" }}
-        />
-
-        <Moon
-          size={10}
-          className={`transition-opacity duration-300 ${
-            isDark ? "opacity-50" : "opacity-20"
-          }`}
-          style={{ color: "var(--accent)" }}
-        />
+          <span
+            className="flex h-9 w-9 items-center justify-center"
+            style={{ color: "var(--accent)" }}
+          >
+            <Moon size={15} strokeWidth={2.2} />
+          </span>
+        </span>
       </span>
     </button>
   );

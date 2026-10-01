@@ -2,6 +2,7 @@ import { useEffect, useState } from "react";
 import ListItem from "../list/ListItem";
 import NewListForm from "../list/NewListForm";
 import ConfirmDialog from "../common/ConfirmDialog";
+import useLocalStorage from "../../hooks/useLocalStorage";
 import {
   BookMarked,
   BookOpen,
@@ -12,6 +13,7 @@ import {
 } from "lucide-react";
 
 import ListIcon from "../common/ListIcon";
+import { getSuggestedListIcon } from "../../lib/listIcons";
 
 function ListsBlock({
   lists,
@@ -57,7 +59,14 @@ export default function Sidebar({
 }) {
   const [editingId, setEditingId] = useState(null);
   const [deleteTarget, setDeleteTarget] = useState(null);
-  const [isCollapsed, setIsCollapsed] = useState(false);
+
+  // Desktop collapse preference is persisted; the mobile drawer is separate
+  // state that never writes to it.
+  const [isCollapsed, setIsCollapsed] = useLocalStorage(
+    "todo-app-sidebar-collapsed",
+    true,
+  );
+
   const [isMobileOpen, setIsMobileOpen] = useState(false);
 
   // Close mobile drawer when switching to desktop.
@@ -112,15 +121,16 @@ export default function Sidebar({
       <button
         type="button"
         aria-label="Open notebook"
+        title="Open notebook"
         onClick={() => setIsMobileOpen(true)}
-        className="fixed left-3 top-3 z-30 inline-flex h-10 w-10 items-center justify-center rounded-xl border shadow-lg backdrop-blur-md transition hover:scale-105 active:scale-95 lg:hidden"
+        className="fixed left-5 top-2 z-40 inline-flex h-10 w-10 items-center justify-center rounded-xl border shadow-lg backdrop-blur-md transition hover:scale-105 active:scale-95 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-(--primary) sm:left-7 sm:top-2.5 lg:hidden"
         style={{
           background: "var(--bg-elevated)",
           borderColor: "var(--border)",
           color: "var(--text)",
         }}
       >
-        <BookOpen size={18} />
+        <BookOpen size={18} aria-hidden="true" />
       </button>
 
       {/* Mobile overlay */}
@@ -323,21 +333,40 @@ export default function Sidebar({
                       type="button"
                       title={list.name}
                       aria-label={list.name}
+                      aria-current={isSelected ? "page" : undefined}
                       onClick={() => onSelect(list.id)}
-                      className={`relative flex h-11 w-11 items-center justify-center rounded-xl border shadow-sm transition hover:scale-[1.03] active:scale-95 ${
+                      className={`relative flex h-11 w-11 items-center justify-center rounded-xl border shadow-sm transition hover:scale-[1.03] active:scale-95 focus-visible:outline-2 focus-visible:outline-offset-2 ${
                         isSelected
-                          ? "border-white bg-white text-zinc-900 shadow-md"
+                          ? "shadow-md"
                           : "border-white/15 bg-white/10 text-white/70 backdrop-blur hover:bg-white/15 hover:text-white"
                       }`}
+                      style={
+                        isSelected
+                          ? {
+                              background: "var(--primary-soft)",
+                              borderColor: "var(--primary)",
+                              color: "var(--primary)",
+                              outlineColor: "var(--primary)",
+                            }
+                          : undefined
+                      }
                     >
                       <ListIcon
-                        icon={list.icon ?? "folder"}
+                        icon={
+                          list.icon ??
+                          (list.id === "inbox"
+                            ? "inbox"
+                            : getSuggestedListIcon(list.name))
+                        }
                         size={17}
                         strokeWidth={1.9}
                       />
 
                       {isSelected && (
-                        <span className="absolute -left-1 h-5 w-0.75 rounded-full bg-white" />
+                        <span
+                          className="absolute -left-1 h-5 w-0.75 rounded-full"
+                          style={{ background: "var(--primary)" }}
+                        />
                       )}
                     </button>
                   );
@@ -357,10 +386,11 @@ export default function Sidebar({
                 <button
                   type="button"
                   onClick={() => setIsCollapsed(false)}
-                  className="inline-flex h-9 w-9 items-center justify-center rounded-xl bg-white text-zinc-900 shadow-md transition hover:bg-zinc-100"
+                  aria-label="New list"
                   title="New list"
+                  className="inline-flex h-9 w-9 items-center justify-center rounded-xl bg-white text-zinc-900 shadow-md transition hover:bg-zinc-100 focus-visible:outline-2 focus-visible:outline-offset-2"
                 >
-                  <Plus size={14} />
+                  <Plus size={14} aria-hidden="true" />
                 </button>
               </div>
             </div>

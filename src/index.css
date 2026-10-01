@@ -30,6 +30,11 @@
 
   --accent: #2a7a6b;
 
+  /* Editorial display face for page headings (no script/cursive). */
+  --font-display:
+    "Palatino Linotype", "Book Antiqua", Palatino, "Iowan Old Style", Georgia,
+    "Times New Roman", serif;
+
   /* semantic aliases */
   --page-bg: var(--bg);
   --surface: var(--bg-soft);
@@ -219,10 +224,6 @@ input,
 textarea,
 select {
   font: inherit;
-}
-
-button {
-  color: inherit;
 }
 
 a {

@@ -1,4 +1,5 @@
 import { useState } from "react";
+import { FileText, Plus } from "lucide-react";
 import AddTaskCard from "../components/task/AddTaskCard";
 import AddTaskFab from "../components/task/AddTaskFab";
 import TaskList from "../components/task/TaskList";
@@ -31,9 +32,6 @@ export default function Inbox({
     search,
     filter,
   });
-  const hasActiveTasks = search.trim()
-    ? tasks.some((t) => !t.completed)
-    : tasks.some((t) => !t.completed && t.listId === selectedListId);
   function handleAddTask(title, description, checklist) {
     addTask(title, description, checklist, selectedListId);
   }
@@ -49,23 +47,23 @@ export default function Inbox({
         renameList={renameList}
         deleteList={deleteList}
       />
-      <main className="min-h-screen flex-1">
-        <div className="w-full px-4 pb-10 pt-16 sm:px-6 sm:pt-8 lg:px-8 lg:pt-8">
-          <div className="max-w-350 mx-auto">
+      <main className="min-h-screen min-w-0 flex-1">
+        <div className="w-full min-w-0 px-4 pb-10 sm:px-6 lg:px-8 lg:pt-8">
+          <div className="mx-auto min-w-0 max-w-350">
             <Navbar
               searchValue={search}
               onSearchChange={setSearch}
               onNewTask={() => setIslandOpen(true)}
             />
-            <header className="mb-6 text-center sm:mb-8">
+            <header className="mb-4 min-w-0 sm:mb-6">
               <h1
-                className="text-2xl font-extrabold tracking-tight sm:text-3xl lg:text-4xl"
+                className="truncate [font-family:var(--font-display)] text-xl font-bold tracking-tight sm:text-2xl lg:text-3xl"
                 style={{ color: "var(--text)" }}
               >
                 {selectedListName}
               </h1>
               <p
-                className="mx-auto mt-2 max-w-xl text-sm leading-relaxed sm:text-[15px]"
+                className="mt-1.5 hidden max-w-xl text-xs leading-relaxed min-[400px]:block sm:text-sm"
                 style={{ color: "var(--text-muted)" }}
               >
                 {search.trim()
@@ -80,24 +78,26 @@ export default function Inbox({
                 onOpenChange={setIslandOpen}
               />
               <div className="space-y-4">
-                <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-                  <TaskCounter total={activeTasks.length} label="Active" />
+                <div className="flex flex-col items-start gap-3">
                   <FilterBar filter={filter} onChange={setFilter} />
+                  <TaskCounter total={activeTasks.length} label="Active" />
                 </div>
                 {activeTasks.length === 0 ? (
                   <EmptyState
+                    icon={search.trim() ? FileText : Plus}
                     title={
-                      hasActiveTasks ? "No matching tasks" : "No active tasks"
+                      search.trim() ? "No matching tasks" : "No active tasks"
                     }
                     description={
-                      hasActiveTasks
+                      search.trim()
                         ? "Try another search keyword or clear the search."
                         : "Create your first task — it will appear on this paper."
                     }
+                    actionLabel={search.trim() ? undefined : "Add task"}
+                    onAction={search.trim() ? undefined : () => setIslandOpen(true)}
                   />
                 ) : (
                   <TaskList
-                    title="Active Tasks"
                     tasks={activeTasks}
                     taskActions={taskActions}
                     editingId={editingId}

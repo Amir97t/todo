@@ -49,53 +49,53 @@ export default function Completed({
         deleteList={deleteList}
       />
 
-      <main className="min-h-screen flex-1">
-        <div className="w-full px-4 pb-10 pt-6 sm:px-6 sm:pt-8 lg:px-8">
-          <Navbar searchValue={search} onSearchChange={setSearch} />
+      <main className="min-h-screen min-w-0 flex-1">
+        <div className="w-full min-w-0 px-4 pb-10 sm:px-6 lg:px-8 lg:pt-8">
+          <div className="mx-auto min-w-0 max-w-350">
+            <Navbar searchValue={search} onSearchChange={setSearch} />
 
-          <header className="mb-6 text-center sm:mb-8">
-            <h1
-              className="text-2xl font-extrabold tracking-tight sm:text-3xl lg:text-4xl"
-              style={{ color: "var(--text)" }}
-            >
-              Completed
-            </h1>
+            <header className="mb-4 min-w-0 sm:mb-6">
+              <h1
+                className="truncate [font-family:var(--font-display)] text-xl font-bold tracking-tight sm:text-2xl lg:text-3xl"
+                style={{ color: "var(--text)" }}
+              >
+                Completed
+              </h1>
 
-            <p
-              className="mx-auto mt-2 max-w-xl text-sm leading-relaxed sm:text-[15px]"
-              style={{ color: "var(--text-muted)" }}
-            >
-              Review what you have finished.
-            </p>
-          </header>
+              <p
+                className="mt-1.5 hidden max-w-xl text-xs leading-relaxed min-[400px]:block sm:text-sm"
+                style={{ color: "var(--text-muted)" }}
+              >
+                Review what you have finished.
+              </p>
+            </header>
 
-          <div className="space-y-4">
-            <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-              <TaskCounter total={completedTasks.length} label="Completed" />
+            <div className="space-y-4">
+              <div className="flex flex-col items-start gap-3">
+                <FilterBar filter={filter} onChange={setFilter} />
+                <TaskCounter total={completedTasks.length} label="Completed" />
+              </div>
 
-              <FilterBar filter={filter} onChange={setFilter} />
+              {completedTasks.length === 0 ? (
+                <EmptyState
+                  title={
+                    hasCompletedTasks ? "No matching tasks" : "No completed tasks"
+                  }
+                  description={
+                    hasCompletedTasks
+                      ? "Try another search keyword."
+                      : "Complete a task to see it here."
+                  }
+                />
+              ) : (
+                <TaskList
+                  tasks={completedTasks}
+                  taskActions={taskActions}
+                  editingId={editingId}
+                  onStartEdit={setEditingId}
+                />
+              )}
             </div>
-
-            {completedTasks.length === 0 ? (
-              <EmptyState
-                title={
-                  hasCompletedTasks ? "No matching tasks" : "No completed tasks"
-                }
-                description={
-                  hasCompletedTasks
-                    ? "Try another search keyword."
-                    : "Complete a task to see it here."
-                }
-              />
-            ) : (
-              <TaskList
-                title="Completed Tasks"
-                tasks={completedTasks}
-                taskActions={taskActions}
-                editingId={editingId}
-                onStartEdit={setEditingId}
-              />
-            )}
           </div>
         </div>
       </main>
