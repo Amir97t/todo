@@ -99,8 +99,8 @@ export default function Sidebar({
     };
   }, [isMobileOpen]);
 
-  function handleRename(id, name, icon) {
-    const ok = renameList(id, name, icon);
+  async function handleRename(id, name, icon) {
+    const ok = await renameList(id, name, icon);
 
     if (ok) {
       setEditingId(null);

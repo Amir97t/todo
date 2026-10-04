@@ -20,12 +20,14 @@ export default function NewListForm({ onSave }) {
     }
   }, [isOpen]);
 
-  function handleSave() {
+  async function handleSave() {
     const value = name.trim();
 
     if (!value) return;
 
-    const saved = onSave(value, activeIcon);
+    // onSave is async: a bare Promise is always truthy, so the result has to
+    // be awaited before the form is allowed to close.
+    const saved = await onSave(value, activeIcon);
 
     if (!saved) return;
 

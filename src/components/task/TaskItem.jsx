@@ -41,7 +41,15 @@ export default function TaskItem({
   editingId,
   onStartEdit,
 }) {
-  const { toggleTask, editTask, deleteTask } = taskActions;
+  const {
+    toggleTask,
+    editTask,
+    deleteTask,
+    addChecklistItem,
+    updateChecklistItem,
+    deleteChecklistItem,
+    toggleChecklistItem,
+  } = taskActions;
 
   const {
     value: editValues,
@@ -97,38 +105,19 @@ export default function TaskItem({
   }
 
   function handleToggleChecklistItem(itemId) {
-    editTask(task.id, {
-      checklist: checklist.map((item) =>
-        item.id === itemId ? { ...item, completed: !item.completed } : item,
-      ),
-    });
+    toggleChecklistItem(task.id, itemId);
   }
 
   function handleAddChecklistItem(text) {
-    editTask(task.id, {
-      checklist: [
-        ...checklist,
-        {
-          id: crypto.randomUUID(),
-          text,
-          completed: false,
-        },
-      ],
-    });
+    addChecklistItem(task.id, text);
   }
 
   function handleDeleteChecklistItem(itemId) {
-    editTask(task.id, {
-      checklist: checklist.filter((item) => item.id !== itemId),
-    });
+    deleteChecklistItem(task.id, itemId);
   }
 
   function handleEditChecklistItem(itemId, text) {
-    editTask(task.id, {
-      checklist: checklist.map((item) =>
-        item.id === itemId ? { ...item, text } : item,
-      ),
-    });
+    updateChecklistItem(task.id, itemId, { text });
   }
 
   if (isEditing) {

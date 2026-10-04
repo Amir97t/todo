@@ -17,6 +17,10 @@ const DEFAULT_LISTS = [
 
 const DEFAULT_TASKS = [];
 
+function taskChecklist(task) {
+  return Array.isArray(task.checklist) ? task.checklist : [];
+}
+
 export default function App() {
   // App owns application data; persistence is handled by useLocalStorage.
   const [lists, setLists] = useLocalStorage(LISTS_STORAGE_KEY, DEFAULT_LISTS);
@@ -28,7 +32,10 @@ export default function App() {
     "inbox",
   );
 
-  function addList(name, icon) {
+  // Every action is async and resolves to an explicit boolean so callers can
+  // await the real outcome. Validation happens against the current render's
+  // state; the state updater itself stays pure.
+  async function addList(name, icon) {
     const trimmed = name.trim();
 
     if (!trimmed) return false;
@@ -51,10 +58,12 @@ export default function App() {
     return true;
   }
 
-  function renameList(id, name, icon) {
+  async function renameList(id, name, icon) {
     const trimmed = name.trim();
 
     if (!trimmed) return false;
+
+    if (!lists.some((list) => list.id === id)) return false;
 
     const exists = lists.some(
       (list) =>
@@ -78,9 +87,10 @@ export default function App() {
     return true;
   }
 
-  function deleteList(id, deleteTasks = false) {
+  async function deleteList(id, deleteTasks = false) {
     // App owns destructive operations because it owns the source data.
-    if (id === "inbox") return;
+    if (id === "inbox") return false;
+    if (!lists.some((list) => list.id === id)) return false;
 
     if (deleteTasks) {
       setTasks((prev) => prev.filter((task) => task.listId !== id));
@@ -102,15 +112,16 @@ export default function App() {
     if (selectedListId === id) {
       setSelectedListId("inbox");
     }
+
+    return true;
   }
 
-  function addTask(title, description, checklist, listId) {
+  async function addTask(title, description, checklist, listId) {
     const trimmedTitle = title.trim();
 
-    if (!trimmedTitle) return;
+    if (!trimmedTitle) return false;
+    if (!lists.some((list) => list.id === listId)) return false;
 
-    const listExists = lists.some((list) => list.id === listId);
-    if (!listExists) return;
     const newTask = {
       id: crypto.randomUUID(),
       title: trimmedTitle,
@@ -122,13 +133,21 @@ export default function App() {
     };
 
     setTasks((prev) => [...prev, newTask]);
+
+    return true;
   }
 
-  function deleteTask(id) {
+  async function deleteTask(id) {
+    if (!tasks.some((task) => task.id === id)) return false;
+
     setTasks((prev) => prev.filter((task) => task.id !== id));
+
+    return true;
   }
 
-  function toggleTask(id) {
+  async function toggleTask(id) {
+    if (!tasks.some((task) => task.id === id)) return false;
+
     setTasks((prev) =>
       prev.map((task) =>
         task.id === id
@@ -139,13 +158,17 @@ export default function App() {
           : task,
       ),
     );
+
+    return true;
   }
 
-  function editTask(id, updatedTask) {
+  async function editTask(id, updatedTask) {
+    if (!tasks.some((task) => task.id === id)) return false;
+
     if (updatedTask.listId) {
       const listExists = lists.some((list) => list.id === updatedTask.listId);
 
-      if (!listExists) return;
+      if (!listExists) return false;
     }
 
     setTasks((prev) =>
@@ -158,6 +181,99 @@ export default function App() {
           : task,
       ),
     );
+
+    return true;
+  }
+
+  async function addChecklistItem(taskId, text) {
+    const trimmed = typeof text === "string" ? text.trim() : "";
+
+    if (!trimmed) return false;
+    if (!tasks.some((task) => task.id === taskId)) return false;
+
+    const newItem = {
+      id: crypto.randomUUID(),
+      text: trimmed,
+      completed: false,
+    };
+
+    setTasks((prev) =>
+      prev.map((task) =>
+        task.id === taskId
+          ? { ...task, checklist: [...taskChecklist(task), newItem] }
+          : task,
+      ),
+    );
+
+    return true;
+  }
+
+  async function updateChecklistItem(taskId, itemId, patch) {
+    const task = tasks.find((candidate) => candidate.id === taskId);
+
+    if (!task) return false;
+    if (!taskChecklist(task).some((item) => item.id === itemId)) return false;
+
+    setTasks((prev) =>
+      prev.map((candidate) =>
+        candidate.id === taskId
+          ? {
+              ...candidate,
+              checklist: taskChecklist(candidate).map((item) =>
+                item.id === itemId ? { ...item, ...patch } : item,
+              ),
+            }
+          : candidate,
+      ),
+    );
+
+    return true;
+  }
+
+  async function toggleChecklistItem(taskId, itemId) {
+    const task = tasks.find((candidate) => candidate.id === taskId);
+
+    if (!task) return false;
+    if (!taskChecklist(task).some((item) => item.id === itemId)) return false;
+
+    setTasks((prev) =>
+      prev.map((candidate) =>
+        candidate.id === taskId
+          ? {
+              ...candidate,
+              checklist: taskChecklist(candidate).map((item) =>
+                item.id === itemId
+                  ? { ...item, completed: !item.completed }
+                  : item,
+              ),
+            }
+          : candidate,
+      ),
+    );
+
+    return true;
+  }
+
+  async function deleteChecklistItem(taskId, itemId) {
+    const task = tasks.find((candidate) => candidate.id === taskId);
+
+    if (!task) return false;
+    if (!taskChecklist(task).some((item) => item.id === itemId)) return false;
+
+    setTasks((prev) =>
+      prev.map((candidate) =>
+        candidate.id === taskId
+          ? {
+              ...candidate,
+              checklist: taskChecklist(candidate).filter(
+                (item) => item.id !== itemId,
+              ),
+            }
+          : candidate,
+      ),
+    );
+
+    return true;
   }
 
   const taskActions = {
@@ -165,6 +281,10 @@ export default function App() {
     deleteTask,
     toggleTask,
     editTask,
+    addChecklistItem,
+    updateChecklistItem,
+    deleteChecklistItem,
+    toggleChecklistItem,
   };
 
   return (
