@@ -61,6 +61,11 @@ export default function TaskItem({
 
   const isEditing = editingId === task.id;
   const checklist = Array.isArray(task.checklist) ? task.checklist : [];
+  // A malformed legacy row can carry an object/array here. Rendering it throws
+  // and editing it would throw on trim, so fall back to an empty description;
+  // the migration layer is what rejects that data rather than rewriting it.
+  const descriptionText =
+    typeof task.description === "string" ? task.description : "";
 
   const colorIndex = getStableIndex(task.id, STICKY_COLORS.length);
   const rotationIndex = getStableIndex(task.id, ROTATIONS.length);
@@ -80,7 +85,7 @@ export default function TaskItem({
   function handleStartEdit() {
     startEditing({
       title: task.title ?? "",
-      description: task.description ?? "",
+      description: descriptionText,
     });
 
     onStartEdit(task.id);
@@ -257,12 +262,12 @@ export default function TaskItem({
         </div>
       </div>
 
-      {task.description && (
+      {descriptionText && (
         <p
           className="mt-2 min-w-0 line-clamp-3 wrap-break-word text-sm leading-relaxed"
           style={{ color: "var(--text-muted)" }}
         >
-          {task.description}
+          {descriptionText}
         </p>
       )}
 
