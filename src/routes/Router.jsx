@@ -11,41 +11,29 @@ export default function Router({
   addList,
   renameList,
   deleteList,
+  dataStatus,
+  dataError,
+  onRetry,
 }) {
+  const shared = {
+    tasks,
+    taskActions,
+    lists,
+    selectedListId,
+    setSelectedListId,
+    addList,
+    renameList,
+    deleteList,
+    dataStatus,
+    dataError,
+    onRetry,
+  };
+
   return (
     <BrowserRouter>
       <Routes>
-        <Route
-          path="/"
-          element={
-            <Inbox
-              tasks={tasks}
-              taskActions={taskActions}
-              lists={lists}
-              selectedListId={selectedListId}
-              setSelectedListId={setSelectedListId}
-              addList={addList}
-              renameList={renameList}
-              deleteList={deleteList}
-            />
-          }
-        />
-
-        <Route
-          path="/completed"
-          element={
-            <Completed
-              tasks={tasks}
-              taskActions={taskActions}
-              lists={lists}
-              selectedListId={selectedListId}
-              setSelectedListId={setSelectedListId}
-              addList={addList}
-              renameList={renameList}
-              deleteList={deleteList}
-            />
-          }
-        />
+        <Route path="/" element={<Inbox {...shared} />} />
+        <Route path="/completed" element={<Completed {...shared} />} />
       </Routes>
     </BrowserRouter>
   );

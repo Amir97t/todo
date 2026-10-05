@@ -19,6 +19,9 @@ export default function Inbox({
   addList,
   renameList,
   deleteList,
+  dataStatus = "ready",
+  dataError = null,
+  onRetry,
 }) {
   const [editingId, setEditingId] = useState(null);
   const [islandOpen, setIslandOpen] = useState(false);
@@ -72,39 +75,59 @@ export default function Inbox({
               </p>
             </header>
             <div className="space-y-6">
-              <AddTaskCard
-                onAddTask={handleAddTask}
-                open={islandOpen}
-                onOpenChange={setIslandOpen}
-              />
-              <div className="space-y-4">
-                <div className="flex flex-col items-start gap-3">
-                  <FilterBar filter={filter} onChange={setFilter} />
-                  <TaskCounter total={activeTasks.length} label="Active" />
-                </div>
-                {activeTasks.length === 0 ? (
-                  <EmptyState
-                    icon={search.trim() ? FileText : Plus}
-                    title={
-                      search.trim() ? "No matching tasks" : "No active tasks"
-                    }
-                    description={
-                      search.trim()
-                        ? "Try another search keyword or clear the search."
-                        : "Create your first task — it will appear on this paper."
-                    }
-                    actionLabel={search.trim() ? undefined : "Add task"}
-                    onAction={search.trim() ? undefined : () => setIslandOpen(true)}
+              {dataStatus === "loading" ? (
+                <EmptyState
+                  title="Loading your tasks…"
+                  description="Fetching your data from the server."
+                />
+              ) : dataStatus === "error" ? (
+                <EmptyState
+                  title="Could not load your data"
+                  description={
+                    dataError || "Something went wrong while loading your data."
+                  }
+                  actionLabel="Try again"
+                  onAction={onRetry}
+                />
+              ) : (
+                <>
+                  <AddTaskCard
+                    onAddTask={handleAddTask}
+                    open={islandOpen}
+                    onOpenChange={setIslandOpen}
                   />
-                ) : (
-                  <TaskList
-                    tasks={activeTasks}
-                    taskActions={taskActions}
-                    editingId={editingId}
-                    onStartEdit={setEditingId}
-                  />
-                )}
-              </div>
+                  <div className="space-y-4">
+                    <div className="flex flex-col items-start gap-3">
+                      <FilterBar filter={filter} onChange={setFilter} />
+                      <TaskCounter total={activeTasks.length} label="Active" />
+                    </div>
+                    {activeTasks.length === 0 ? (
+                      <EmptyState
+                        icon={search.trim() ? FileText : Plus}
+                        title={
+                          search.trim() ? "No matching tasks" : "No active tasks"
+                        }
+                        description={
+                          search.trim()
+                            ? "Try another search keyword or clear the search."
+                            : "Create your first task — it will appear on this paper."
+                        }
+                        actionLabel={search.trim() ? undefined : "Add task"}
+                        onAction={
+                          search.trim() ? undefined : () => setIslandOpen(true)
+                        }
+                      />
+                    ) : (
+                      <TaskList
+                        tasks={activeTasks}
+                        taskActions={taskActions}
+                        editingId={editingId}
+                        onStartEdit={setEditingId}
+                      />
+                    )}
+                  </div>
+                </>
+              )}
             </div>
           </div>
         </div>

@@ -4,6 +4,7 @@ import Button from "../ui/Button";
 import useInlineEditing from "../../hooks/useInlineEditing";
 import { Pencil, Trash2 } from "lucide-react";
 import { getSuggestedListIcon, LIST_ICON_OPTIONS } from "../../lib/listIcons";
+import { INBOX_LIST_ID } from "../../lib/constants";
 import ListIcon from "../common/ListIcon";
 
 export default function ListItem({
@@ -22,7 +23,7 @@ export default function ListItem({
   const [editIcon, setEditIcon] = useState(null);
 
   const isCurrentEditingList = editingId === list.id;
-  const isInbox = list.id === "inbox";
+  const isInbox = list.id === INBOX_LIST_ID;
 
   const listIcon =
     list.icon ?? (isInbox ? "inbox" : getSuggestedListIcon(list.name));

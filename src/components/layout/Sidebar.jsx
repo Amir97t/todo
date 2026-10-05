@@ -14,6 +14,7 @@ import {
 
 import ListIcon from "../common/ListIcon";
 import { getSuggestedListIcon } from "../../lib/listIcons";
+import { INBOX_LIST_ID } from "../../lib/constants";
 
 function ListsBlock({
   lists,
@@ -354,7 +355,7 @@ export default function Sidebar({
                       <ListIcon
                         icon={
                           list.icon ??
-                          (list.id === "inbox"
+                          (list.id === INBOX_LIST_ID
                             ? "inbox"
                             : getSuggestedListIcon(list.name))
                         }

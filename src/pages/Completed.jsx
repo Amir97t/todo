@@ -17,6 +17,9 @@ export default function Completed({
   addList,
   renameList,
   deleteList,
+  dataStatus = "ready",
+  dataError = null,
+  onRetry,
 }) {
   const [search, setSearch] = useState("");
   const [filter, setFilter] = useState("newest");
@@ -71,29 +74,52 @@ export default function Completed({
             </header>
 
             <div className="space-y-4">
-              <div className="flex flex-col items-start gap-3">
-                <FilterBar filter={filter} onChange={setFilter} />
-                <TaskCounter total={completedTasks.length} label="Completed" />
-              </div>
-
-              {completedTasks.length === 0 ? (
+              {dataStatus === "loading" ? (
                 <EmptyState
-                  title={
-                    hasCompletedTasks ? "No matching tasks" : "No completed tasks"
-                  }
+                  title="Loading your tasks…"
+                  description="Fetching your data from the server."
+                />
+              ) : dataStatus === "error" ? (
+                <EmptyState
+                  title="Could not load your data"
                   description={
-                    hasCompletedTasks
-                      ? "Try another search keyword."
-                      : "Complete a task to see it here."
+                    dataError || "Something went wrong while loading your data."
                   }
+                  actionLabel="Try again"
+                  onAction={onRetry}
                 />
               ) : (
-                <TaskList
-                  tasks={completedTasks}
-                  taskActions={taskActions}
-                  editingId={editingId}
-                  onStartEdit={setEditingId}
-                />
+                <>
+                  <div className="flex flex-col items-start gap-3">
+                    <FilterBar filter={filter} onChange={setFilter} />
+                    <TaskCounter
+                      total={completedTasks.length}
+                      label="Completed"
+                    />
+                  </div>
+
+                  {completedTasks.length === 0 ? (
+                    <EmptyState
+                      title={
+                        hasCompletedTasks
+                          ? "No matching tasks"
+                          : "No completed tasks"
+                      }
+                      description={
+                        hasCompletedTasks
+                          ? "Try another search keyword."
+                          : "Complete a task to see it here."
+                      }
+                    />
+                  ) : (
+                    <TaskList
+                      tasks={completedTasks}
+                      taskActions={taskActions}
+                      editingId={editingId}
+                      onStartEdit={setEditingId}
+                    />
+                  )}
+                </>
               )}
             </div>
           </div>
