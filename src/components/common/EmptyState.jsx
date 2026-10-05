@@ -6,14 +6,21 @@ export default function EmptyState({
   actionLabel,
   onAction,
   icon: Icon = FileText,
+  showActionLabel = false,
 }) {
   const hasAction = Boolean(actionLabel && onAction);
+  // Recovery controls must advertise themselves in text; optional shortcuts
+  // keep the compact icon-only treatment they already ship with.
+  const withLabel = hasAction && showActionLabel;
+
+  const interactionClass = hasAction
+    ? "hover:brightness-110 active:scale-95 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-(--primary)"
+    : "cursor-default";
 
   const boxClass = [
-    "mx-auto mb-4 flex h-14 w-14 items-center justify-center rounded-2xl border transition",
-    hasAction
-      ? "hover:brightness-110 active:scale-95 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-(--primary)"
-      : "cursor-default",
+    "mx-auto mb-4 flex items-center justify-center rounded-2xl border transition",
+    withLabel ? "h-11 w-fit gap-2 px-5" : "h-14 w-14",
+    interactionClass,
   ].join(" ");
 
   const boxStyle = hasAction
@@ -41,7 +48,12 @@ export default function EmptyState({
           className={boxClass}
           style={boxStyle}
         >
-          <Icon size={24} strokeWidth={2.4} aria-hidden="true" />
+          <Icon
+            size={withLabel ? 18 : 24}
+            strokeWidth={withLabel ? 2.2 : 2.4}
+            aria-hidden="true"
+          />
+          {withLabel ? <span className="text-sm font-semibold">{actionLabel}</span> : null}
         </button>
       ) : (
         <div className={boxClass} style={boxStyle}>

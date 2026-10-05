@@ -97,6 +97,7 @@ export default function Inbox({
                   }
                   actionLabel="Try again"
                   onAction={onRetry}
+                  showActionLabel
                 />
               ) : (
                 <>

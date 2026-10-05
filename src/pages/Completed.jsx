@@ -88,6 +88,7 @@ export default function Completed({
                   }
                   actionLabel="Try again"
                   onAction={onRetry}
+                  showActionLabel
                 />
               ) : (
                 <>
