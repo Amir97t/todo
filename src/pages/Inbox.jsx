@@ -1,14 +1,14 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { FileText, Plus } from "lucide-react";
 import AddTaskCard from "../components/task/AddTaskCard";
 import AddTaskFab from "../components/task/AddTaskFab";
 import TaskList from "../components/task/TaskList";
 import Navbar from "../components/layout/Navbar";
-import useTaskFilter from "../hooks/useTaskFilter";
 import TaskCounter from "../components/task/TaskCounter";
 import FilterBar from "../components/task/FilterBar";
 import EmptyState from "../components/common/EmptyState";
 import Sidebar from "../components/layout/Sidebar";
+import { buildTaskQuery } from "../lib/taskQuery";
 
 export default function Inbox({
   tasks,
@@ -19,6 +19,7 @@ export default function Inbox({
   addList,
   renameList,
   deleteList,
+  setTaskQuery,
   dataStatus = "ready",
   dataError = null,
   onRetry,
@@ -28,13 +29,21 @@ export default function Inbox({
   const { addTask } = taskActions;
   const [search, setSearch] = useState("");
   const [filter, setFilter] = useState("newest");
-  const activeTasks = useTaskFilter({
-    tasks,
-    completed: false,
-    selectedListId,
-    search,
-    filter,
-  });
+
+  // The server filters and sorts; this only publishes which query we want.
+  // buildTaskQuery drops listId while a search is active so results span
+  // every list.
+  useEffect(() => {
+    setTaskQuery(
+      buildTaskQuery({
+        listId: selectedListId,
+        completed: false,
+        q: search,
+        sort: filter,
+      }),
+    );
+  }, [setTaskQuery, selectedListId, search, filter]);
+
   function handleAddTask(title, description, checklist) {
     addTask(title, description, checklist, selectedListId);
   }
@@ -70,7 +79,7 @@ export default function Inbox({
                 style={{ color: "var(--text-muted)" }}
               >
                 {search.trim()
-                  ? `Showing results for "${search.trim()}"`
+                  ? `Showing results for "${search.trim()}" across all lists.`
                   : `Focus on your active tasks in ${selectedListName}.`}
               </p>
             </header>
@@ -99,9 +108,9 @@ export default function Inbox({
                   <div className="space-y-4">
                     <div className="flex flex-col items-start gap-3">
                       <FilterBar filter={filter} onChange={setFilter} />
-                      <TaskCounter total={activeTasks.length} label="Active" />
+                      <TaskCounter total={tasks.length} label="Active" />
                     </div>
-                    {activeTasks.length === 0 ? (
+                    {tasks.length === 0 ? (
                       <EmptyState
                         icon={search.trim() ? FileText : Plus}
                         title={
@@ -119,7 +128,7 @@ export default function Inbox({
                       />
                     ) : (
                       <TaskList
-                        tasks={activeTasks}
+                        tasks={tasks}
                         taskActions={taskActions}
                         editingId={editingId}
                         onStartEdit={setEditingId}

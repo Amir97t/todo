@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import {
   checklist as checklistApi,
   lists as listsApi,
@@ -51,6 +51,17 @@ function messageOf(error) {
   return error?.message || "Something went wrong.";
 }
 
+function isSameQuery(previous, next) {
+  if (previous === next) return true;
+  if (!previous || !next) return false;
+
+  const keys = new Set([...Object.keys(previous), ...Object.keys(next)]);
+  for (const key of keys) {
+    if (previous[key] !== next[key]) return false;
+  }
+  return true;
+}
+
 /**
  * Sole owner of server-owned data. Components receive state and actions from
  * here and never touch fetch, the API client, or the legacy storage keys.
@@ -69,6 +80,11 @@ export default function useAppData() {
   const [lists, setLists] = useState(seedLists);
   const [tasks, setTasks] = useState(seedTasks);
   const [retryToken, setRetryToken] = useState(0);
+  // Pages publish the query they want; tasks are whatever the server returns
+  // for it. null means no page has asked yet, so nothing is fetched.
+  const [taskQuery, setTaskQueryState] = useState(null);
+  // Bumped by mutations and by retry to re-run the current query.
+  const [taskVersion, setTaskVersion] = useState(0);
 
   const [storedSelected, setStoredSelected] = useLocalStorage(
     SELECTED_KEY,
@@ -96,10 +112,7 @@ export default function useAppData() {
       try {
         await runMigration();
 
-        const [serverLists, serverTasks] = await Promise.all([
-          listsApi.get(),
-          tasksApi.get(),
-        ]);
+        const serverLists = await listsApi.get();
 
         if (cancelled) return;
 
@@ -116,7 +129,6 @@ export default function useAppData() {
         });
 
         setLists(serverLists);
-        setTasks(serverTasks);
         setStatus("ready");
       } catch (cause) {
         if (cancelled) return;
@@ -132,9 +144,53 @@ export default function useAppData() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [retryToken]);
 
+  // Stable identity so a page's query effect only re-runs when its own
+  // inputs change — otherwise publishing an equal query would loop forever.
+  // Equal content keeps the previous object, so no refetch is triggered.
+  const setTaskQuery = useCallback((next) => {
+    setTaskQueryState((previous) =>
+      isSameQuery(previous, next) ? previous : next,
+    );
+  }, []);
+
+  // The server is the only filter and sorter: whatever it returns is what the
+  // page renders. Each run aborts the previous request so a slow older
+  // response can never overwrite a newer query's results.
+  useEffect(() => {
+    if (status !== "ready" || taskQuery === null) return undefined;
+
+    const controller = new AbortController();
+    let stale = false;
+
+    (async () => {
+      try {
+        const rows = await tasksApi.get(taskQuery, controller.signal);
+        if (stale) return;
+        setTasks(rows);
+        setError(null);
+      } catch (cause) {
+        if (stale || cause?.code === "ABORTED") return;
+        setError(messageOf(cause));
+      }
+    })();
+
+    return () => {
+      stale = true;
+      controller.abort();
+    };
+  }, [status, taskQuery, taskVersion]);
+
   function retry() {
     setActionError(null);
     setRetryToken((token) => token + 1);
+    setTaskVersion((version) => version + 1);
+  }
+
+  // A mutation can move a task out of the active query (toggling completed,
+  // changing list, deleting a list's tasks). With client-side filtering gone
+  // the rendered array must come back from the server to stay truthful.
+  function refreshTasks() {
+    setTaskVersion((version) => version + 1);
   }
 
   function refuse(action) {
@@ -193,6 +249,7 @@ export default function useAppData() {
       setActionError(null);
       setLists((prev) => prev.filter((list) => list.id !== id));
       if (selectedListId === id) setStoredSelected(INBOX_LIST_ID);
+      refreshTasks();
       return true;
     } catch (cause) {
       setActionError(messageOf(cause));
@@ -218,6 +275,7 @@ export default function useAppData() {
       });
       setActionError(null);
       setTasks((prev) => [...prev, created]);
+      refreshTasks();
       return true;
     } catch (cause) {
       setActionError(messageOf(cause));
@@ -232,6 +290,7 @@ export default function useAppData() {
       await tasksApi.remove(id);
       setActionError(null);
       setTasks((prev) => prev.filter((task) => task.id !== id));
+      refreshTasks();
       return true;
     } catch (cause) {
       setActionError(messageOf(cause));
@@ -250,6 +309,7 @@ export default function useAppData() {
       });
       setActionError(null);
       setTasks((prev) => prev.map((task) => (task.id === id ? updated : task)));
+      refreshTasks();
       return true;
     } catch (cause) {
       setActionError(messageOf(cause));
@@ -275,6 +335,7 @@ export default function useAppData() {
       const updated = await tasksApi.update(id, body);
       setActionError(null);
       setTasks((prev) => prev.map((task) => (task.id === id ? updated : task)));
+      refreshTasks();
       return true;
     } catch (cause) {
       setActionError(messageOf(cause));
@@ -381,6 +442,8 @@ export default function useAppData() {
     retry,
     lists,
     tasks,
+    taskQuery,
+    setTaskQuery,
     taskActions,
     addList,
     renameList,

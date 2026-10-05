@@ -10,7 +10,7 @@ import {
 import App from "../src/App.jsx";
 import ThemeProvider from "../src/context/ThemeProvider.jsx";
 import { INBOX_LIST_ID } from "../src/lib/constants.js";
-import { db, reset } from "./fakeApi.js";
+import { db, lastTaskQuery, reset } from "./fakeApi.js";
 
 vi.mock("../src/lib/api.js", async () => {
   const { fakeApi } = await import("./fakeApi.js");
@@ -50,7 +50,12 @@ function seed({
 
 async function boot() {
   renderApp();
+  // Migration writes its record, and its verification step also calls
+  // GET /tasks, so neither proves the store has switched. The page's query
+  // is the one that carries a sort — it can only be sent once status is
+  // "ready" and mutations are unblocked.
   await waitFor(() => expect(migrationRecord()?.status).toBe("done"));
+  await waitFor(() => expect(lastTaskQuery.value?.sort).toBeDefined());
 }
 
 function taskRow(overrides = {}) {
@@ -226,9 +231,10 @@ describe("task actions", () => {
     await boot();
     expect(db.tasks).toHaveLength(1);
 
-    fireEvent.click(
-      screen.getByRole("checkbox", { name: 'Mark "Ship it" as completed' }),
-    );
+    const checkbox = await screen.findByRole("checkbox", {
+      name: 'Mark "Ship it" as completed',
+    });
+    fireEvent.click(checkbox);
 
     await waitFor(() => expect(db.tasks[0].completed).toBe(true));
   });
@@ -237,8 +243,8 @@ describe("task actions", () => {
     seedWithTask();
     await boot();
 
-    fireEvent.click(screen.getByRole("button", { name: "Edit task" }));
-    fireEvent.change(screen.getByPlaceholderText("Title"), {
+    fireEvent.click(await screen.findByRole("button", { name: "Edit task" }));
+    fireEvent.change(await screen.findByPlaceholderText("Title"), {
       target: { value: "  Shipped  " },
     });
     fireEvent.click(screen.getByRole("button", { name: "Save" }));
@@ -251,7 +257,9 @@ describe("task actions", () => {
     seedWithTask();
     await boot();
 
-    fireEvent.click(screen.getByRole("button", { name: "Delete task" }));
+    fireEvent.click(
+      await screen.findByRole("button", { name: "Delete task" }),
+    );
     const dialog = await screen.findByRole("dialog");
     fireEvent.click(within(dialog).getByRole("button", { name: "Delete" }));
 
@@ -280,8 +288,10 @@ describe("checklist actions", () => {
   it("appends an item at the next position", async () => {
     await bootWithChecklist();
 
-    fireEvent.click(screen.getByRole("button", { name: "Add checklist item" }));
-    fireEvent.change(screen.getByLabelText("New checklist item"), {
+    fireEvent.click(
+      await screen.findByRole("button", { name: "Add checklist item" }),
+    );
+    fireEvent.change(await screen.findByLabelText("New checklist item"), {
       target: { value: "  Step three  " },
     });
     fireEvent.click(screen.getByRole("button", { name: "Add checklist item" }));
@@ -302,7 +312,9 @@ describe("checklist actions", () => {
     await bootWithChecklist();
 
     fireEvent.click(
-      screen.getByRole("button", { name: 'Mark "Step one" complete' }),
+      await screen.findByRole("button", {
+        name: 'Mark "Step one" complete',
+      }),
     );
 
     await waitFor(() => expect(currentChecklist()[0].completed).toBe(true));
@@ -312,9 +324,11 @@ describe("checklist actions", () => {
   it("edits a checklist item text", async () => {
     await bootWithChecklist();
 
-    fireEvent.click(screen.getByRole("button", { name: 'Edit "Step one"' }));
+    fireEvent.click(
+      await screen.findByRole("button", { name: 'Edit "Step one"' }),
+    );
     fireEvent.change(
-      screen.getByRole("textbox", { name: 'Edit "Step one"' }),
+      await screen.findByRole("textbox", { name: 'Edit "Step one"' }),
       { target: { value: "  Renamed step  " } },
     );
     fireEvent.click(screen.getByRole("button", { name: "Save checklist item" }));
@@ -326,7 +340,9 @@ describe("checklist actions", () => {
   it("deletes a checklist item and keeps the remaining order", async () => {
     await bootWithChecklist();
 
-    fireEvent.click(screen.getByRole("button", { name: 'Delete "Step one"' }));
+    fireEvent.click(
+      await screen.findByRole("button", { name: 'Delete "Step one"' }),
+    );
 
     await waitFor(() => expect(currentChecklist()).toHaveLength(1));
     expect(currentChecklist()[0].text).toBe("Step two");
@@ -336,8 +352,10 @@ describe("checklist actions", () => {
   it("does not add a whitespace-only checklist item", async () => {
     await bootWithChecklist();
 
-    fireEvent.click(screen.getByRole("button", { name: "Add checklist item" }));
-    fireEvent.change(screen.getByLabelText("New checklist item"), {
+    fireEvent.click(
+      await screen.findByRole("button", { name: "Add checklist item" }),
+    );
+    fireEvent.change(await screen.findByLabelText("New checklist item"), {
       target: { value: "   " },
     });
     fireEvent.click(screen.getByRole("button", { name: "Add checklist item" }));

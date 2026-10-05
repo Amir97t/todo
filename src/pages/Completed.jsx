@@ -1,12 +1,12 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import Navbar from "../components/layout/Navbar";
 import Sidebar from "../components/layout/Sidebar";
 import FilterBar from "../components/task/FilterBar";
 import TaskCounter from "../components/task/TaskCounter";
 import TaskList from "../components/task/TaskList";
-import useTaskFilter from "../hooks/useTaskFilter";
 import EmptyState from "../components/common/EmptyState";
+import { buildTaskQuery } from "../lib/taskQuery";
 
 export default function Completed({
   tasks,
@@ -17,6 +17,7 @@ export default function Completed({
   addList,
   renameList,
   deleteList,
+  setTaskQuery,
   dataStatus = "ready",
   dataError = null,
   onRetry,
@@ -27,14 +28,14 @@ export default function Completed({
 
   const navigate = useNavigate();
 
-  const completedTasks = useTaskFilter({
-    tasks,
-    search,
-    filter,
-    completed: true,
-  });
+  const isSearching = search.trim().length > 0;
 
-  const hasCompletedTasks = tasks.some((task) => task.completed);
+  // Completed is always global: no listId is ever sent from this page.
+  useEffect(() => {
+    setTaskQuery(
+      buildTaskQuery({ completed: true, q: search, sort: filter }),
+    );
+  }, [setTaskQuery, search, filter]);
 
   function handleSelectList(listId) {
     setSelectedListId(listId);
@@ -93,27 +94,27 @@ export default function Completed({
                   <div className="flex flex-col items-start gap-3">
                     <FilterBar filter={filter} onChange={setFilter} />
                     <TaskCounter
-                      total={completedTasks.length}
+                      total={tasks.length}
                       label="Completed"
                     />
                   </div>
 
-                  {completedTasks.length === 0 ? (
+                  {tasks.length === 0 ? (
                     <EmptyState
                       title={
-                        hasCompletedTasks
+                        isSearching
                           ? "No matching tasks"
                           : "No completed tasks"
                       }
                       description={
-                        hasCompletedTasks
+                        isSearching
                           ? "Try another search keyword."
                           : "Complete a task to see it here."
                       }
                     />
                   ) : (
                     <TaskList
-                      tasks={completedTasks}
+                      tasks={tasks}
                       taskActions={taskActions}
                       editingId={editingId}
                       onStartEdit={setEditingId}

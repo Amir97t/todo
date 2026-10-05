@@ -18,6 +18,9 @@ let tasks = [];
 /** Call order, so tests can assert sequencing (e.g. lists before tasks). */
 export const calls = [];
 
+/** The most recent GET /tasks query, so tests can assert what pages send. */
+export const lastTaskQuery = { value: null };
+
 export const db = {
   get lists() {
     return lists;
@@ -32,6 +35,7 @@ export function reset({ lists: nextLists, tasks: nextTasks } = {}) {
   lists = structuredClone(nextLists ?? [INBOX_ROW]);
   tasks = structuredClone(nextTasks ?? []);
   calls.length = 0;
+  lastTaskQuery.value = null;
 }
 
 function fail(message, status, code) {
@@ -138,6 +142,8 @@ export const fakeApi = {
 
   tasks: {
     get: async (query = {}) => {
+      calls.push("tasks.get");
+      lastTaskQuery.value = query;
       let rows = structuredClone(tasks);
 
       if (query.listId) rows = rows.filter((task) => task.listId === query.listId);

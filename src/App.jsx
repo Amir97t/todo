@@ -15,6 +15,7 @@ export default function App() {
     deleteList,
     selectedListId,
     setSelectedListId,
+    setTaskQuery,
   } = useAppData();
 
   return (
@@ -29,6 +30,7 @@ export default function App() {
         deleteList={deleteList}
         selectedListId={selectedListId}
         setSelectedListId={setSelectedListId}
+        setTaskQuery={setTaskQuery}
         dataStatus={status}
         dataError={error}
         onRetry={retry}
