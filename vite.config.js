@@ -8,5 +8,8 @@ export default defineConfig({
   test: {
     environment: "jsdom",
     setupFiles: ["./test/setup.js"],
+    // Boots a backend against todo_test before any test file is imported, so
+    // the live migration test never depends on (or disturbs) todo_dev.
+    globalSetup: ["./test/globalSetup.js"],
   },
 });

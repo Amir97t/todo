@@ -1,12 +1,17 @@
-import { afterAll, beforeAll, describe, expect, it } from "vitest";
+import { afterAll, beforeAll, describe, expect, it, vi } from "vitest";
 import { lists as listsApi, tasks as tasksApi } from "../src/lib/api.js";
 import { INBOX_LIST_ID } from "../src/lib/constants.js";
 import { readMigrationRecord, runMigration } from "../src/lib/migration.js";
+import { LIVE_BASE_URL } from "./liveBackend.js";
 
-const BASE_URL = "http://localhost:3000";
+// globalSetup() already booted a backend here against todo_test and reset it
+// to Inbox-only. Pointing the API client away from todo_dev is what keeps the
+// shared development database and its unknown rows untouched.
+vi.stubEnv("VITE_API_URL", LIVE_BASE_URL);
 
-// A realistic round trip against the real backend. Skipped entirely when it
-// is not running so `npm test` stays usable without a server.
+const BASE_URL = LIVE_BASE_URL;
+
+// Belt and braces: globalSetup guarantees this, so the suite never skips.
 const backend = await (async () => {
   try {
     const response = await fetch(`${BASE_URL}/api/v1/health`, {
