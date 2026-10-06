@@ -10,6 +10,7 @@ export default function ConfirmDialog({
   onConfirm,
   onSecondaryConfirm,
   onCancel,
+  pending = false,
 }) {
   if (!open) return null;
 
@@ -57,11 +58,19 @@ export default function ConfirmDialog({
               variant="danger"
               className="bg-red-800! hover:bg-red-700!"
               onClick={onSecondaryConfirm}
+              disabled={pending}
+              aria-busy={pending}
             >
               {secondaryLabel}
             </Button>
           )}
-          <Button type="button" variant="danger" onClick={onConfirm}>
+          <Button
+            type="button"
+            variant="danger"
+            onClick={onConfirm}
+            disabled={pending}
+            aria-busy={pending}
+          >
             {confirmLabel}
           </Button>
         </div>

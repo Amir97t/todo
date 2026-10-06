@@ -7,6 +7,7 @@ import Input from "../ui/Input";
 import ConfirmDialog from "../common/ConfirmDialog";
 import useInlineEditing from "../../hooks/useInlineEditing";
 import TaskChecklist from "./TaskChecklist";
+import { mutationKeys } from "../../lib/mutationKeys";
 
 const STICKY_COLORS = [
   "var(--sticky-blue)",
@@ -40,6 +41,7 @@ export default function TaskItem({
   taskActions,
   editingId,
   onStartEdit,
+  isPending,
 }) {
   const {
     toggleTask,
@@ -50,6 +52,13 @@ export default function TaskItem({
     deleteChecklistItem,
     toggleChecklistItem,
   } = taskActions;
+
+  // isPending is optional so isolated renders keep working; a second click
+  // is already stopped by the guard in useAppData either way.
+  const savingTask = isPending?.(mutationKeys.editTask(task.id)) ?? false;
+  const deletingTask = isPending?.(mutationKeys.deleteTask(task.id)) ?? false;
+  const addingChecklistItem =
+    isPending?.(mutationKeys.createChecklistItem(task.id)) ?? false;
 
   const {
     value: editValues,
@@ -91,16 +100,20 @@ export default function TaskItem({
     onStartEdit(task.id);
   }
 
-  function handleSave() {
+  async function handleSave() {
     const title = editValues?.title?.trim() ?? "";
     const description = editValues?.description?.trim() ?? "";
 
     if (!title) return;
 
-    editTask(task.id, {
+    // Awaited so Save can show a busy state, and a rejected edit does not
+    // silently drop the user out of edit mode.
+    const saved = await editTask(task.id, {
       title,
       description,
     });
+
+    if (!saved) return;
 
     onStartEdit(null);
   }
@@ -162,6 +175,8 @@ export default function TaskItem({
             <Button
               type="button"
               onClick={handleSave}
+              disabled={savingTask}
+              aria-busy={savingTask}
               className="h-8 flex-1 gap-1.5 text-xs"
             >
               <Save size={12} aria-hidden="true" />
@@ -253,9 +268,11 @@ export default function TaskItem({
           <button
             type="button"
             onClick={() => setIsDeleteOpen(true)}
+            disabled={deletingTask}
+            aria-busy={deletingTask}
             aria-label="Delete task"
             title="Delete task"
-            className="inline-flex h-7 w-7 items-center justify-center rounded-lg border border-(--border) bg-(--bg-elevated) text-(--danger) shadow-sm transition-[background-color,box-shadow,color] hover:bg-(--danger-soft) hover:shadow focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-(--primary)"
+            className="inline-flex h-7 w-7 items-center justify-center rounded-lg border border-(--border) bg-(--bg-elevated) text-(--danger) shadow-sm transition-[background-color,box-shadow,color] hover:bg-(--danger-soft) hover:shadow focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-(--primary) disabled:pointer-events-none disabled:opacity-50"
           >
             <Trash2 size={11} aria-hidden="true" />
           </button>
@@ -302,6 +319,7 @@ export default function TaskItem({
           onToggle={handleToggleChecklistItem}
           onDelete={handleDeleteChecklistItem}
           onEdit={handleEditChecklistItem}
+          pending={addingChecklistItem}
         />
       </div>
 
@@ -310,10 +328,10 @@ export default function TaskItem({
         title="Delete task?"
         description={`Are you sure you want to delete "${task.title}"?`}
         confirmLabel="Delete"
+        pending={deletingTask}
         onCancel={() => setIsDeleteOpen(false)}
-        onConfirm={() => {
-          deleteTask(task.id);
-          setIsDeleteOpen(false);
+        onConfirm={async () => {
+          if (await deleteTask(task.id)) setIsDeleteOpen(false);
         }}
       />
     </Card>

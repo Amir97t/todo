@@ -13,7 +13,7 @@ import {
   CardFooter,
 } from "../ui/Card";
 
-function AddTaskDialog({ open, onClose, onAddTask }) {
+function AddTaskDialog({ open, onClose, onAddTask, pending = false }) {
   const [title, setTitle] = useState("");
   const [description, setDescription] = useState("");
   const [checklist, setChecklist] = useState([]);
@@ -132,14 +132,18 @@ function AddTaskDialog({ open, onClose, onAddTask }) {
     setChecklist((previous) => previous.filter((item) => item.id !== id));
   }
 
-  function handleSubmit(event) {
+  async function handleSubmit(event) {
     event.preventDefault();
 
     const trimmedTitle = title.trim();
 
     if (!trimmedTitle) return;
 
-    onAddTask(trimmedTitle, description.trim(), checklist);
+    // Awaited so the pending state is visible on the submit button, and so a
+    // rejected create does not discard what the user typed.
+    const saved = await onAddTask(trimmedTitle, description.trim(), checklist);
+
+    if (!saved) return;
 
     handleClose();
   }
@@ -346,11 +350,12 @@ function AddTaskDialog({ open, onClose, onAddTask }) {
 
           <Button
             type="submit"
-            disabled={!title.trim()}
+            disabled={!title.trim() || pending}
+            aria-busy={pending}
             className="flex-1 gap-1.5 disabled:opacity-40"
           >
             <Plus size={14} aria-hidden="true" />
-            Add Task
+            {pending ? "Adding…" : "Add Task"}
           </Button>
         </CardFooter>
       </form>
@@ -364,6 +369,7 @@ export default function AddTaskCard({
   open: controlledOpen,
   onOpenChange,
   showTrigger,
+  pending = false,
 }) {
   const [internalOpen, setInternalOpen] = useState(false);
 
@@ -401,6 +407,7 @@ export default function AddTaskCard({
         open={open}
         onClose={() => setOpen(false)}
         onAddTask={onAddTask}
+        pending={pending}
       />
     </>
   );

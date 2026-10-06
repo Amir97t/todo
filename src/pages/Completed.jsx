@@ -17,6 +17,7 @@ export default function Completed({
   addList,
   renameList,
   deleteList,
+  isPending,
   setTaskQuery,
   dataStatus = "ready",
   dataError = null,
@@ -51,6 +52,7 @@ export default function Completed({
         addList={addList}
         renameList={renameList}
         deleteList={deleteList}
+        isPending={isPending}
       />
 
       <main className="min-h-screen min-w-0 flex-1">
@@ -119,6 +121,7 @@ export default function Completed({
                       taskActions={taskActions}
                       editingId={editingId}
                       onStartEdit={setEditingId}
+                      isPending={isPending}
                     />
                   )}
                 </>

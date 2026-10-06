@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
   checklist as checklistApi,
   lists as listsApi,
@@ -6,6 +6,7 @@ import {
 } from "../lib/api.js";
 import { INBOX_LIST_ID } from "../lib/constants.js";
 import { readMigrationRecord, runMigration } from "../lib/migration.js";
+import { mutationKeys } from "../lib/mutationKeys.js";
 import useLocalStorage from "./useLocalStorage.js";
 
 const LEGACY_LISTS_KEY = "todo-app-lists";
@@ -85,6 +86,53 @@ export default function useAppData() {
   const [taskQuery, setTaskQueryState] = useState(null);
   // Bumped by mutations and by retry to re-run the current query.
   const [taskVersion, setTaskVersion] = useState(0);
+
+  // Keyed in-flight guard. A second submission of the same operation joins
+  // the first promise rather than issuing a second request, so a double-click
+  // cannot create a second row. Keys are scoped to the resource acted on, so
+  // unrelated mutations never block one another, and the key is released in
+  // `finally` so a failure never wedges the action.
+  const [pending, setPending] = useState(() => new Set());
+  const pendingRef = useRef(new Map());
+
+  const isPending = (key) => pending.has(key);
+
+  function setPendingKey(key, held) {
+    setPending((previous) => {
+      const next = new Set(previous);
+      if (held) next.add(key);
+      else next.delete(key);
+      return next;
+    });
+  }
+
+  function mutate(key, run) {
+    const existing = pendingRef.current.get(key);
+    if (existing) return existing;
+
+    const promise = (async () => {
+      try {
+        return await run();
+      } finally {
+        pendingRef.current.delete(key);
+        setPendingKey(key, false);
+      }
+    })();
+
+    pendingRef.current.set(key, promise);
+    setPendingKey(key, true);
+    return promise;
+  }
+
+  // Wraps the public action only: internal helpers keep calling the raw
+  // function, so a wrapper never awaits the promise it is holding.
+  function guard(keyFor, fn) {
+    // The wrapper is only ever invoked from event handlers, never during
+    // render, so pendingRef is not read while rendering. The compiler's ref
+    // rule cannot follow that through the closure.
+    // eslint-disable-next-line react-hooks/refs
+    return (...args) => mutate(keyFor(...args), () => fn(...args));
+  }
 
   const [storedSelected, setStoredSelected] = useLocalStorage(
     SELECTED_KEY,
@@ -425,29 +473,47 @@ export default function useAppData() {
   }
 
   const taskActions = {
-    addTask,
-    deleteTask,
-    toggleTask,
-    editTask,
-    addChecklistItem,
-    updateChecklistItem,
-    deleteChecklistItem,
-    toggleChecklistItem,
+    addTask: guard(
+      (title, description, checklist, listId) => mutationKeys.createTask(listId),
+      addTask,
+    ),
+    deleteTask: guard((id) => mutationKeys.deleteTask(id), deleteTask),
+    toggleTask: guard((id) => mutationKeys.toggleTask(id), toggleTask),
+    editTask: guard((id) => mutationKeys.editTask(id), editTask),
+    addChecklistItem: guard(
+      (taskId) => mutationKeys.createChecklistItem(taskId),
+      addChecklistItem,
+    ),
+    updateChecklistItem: guard(
+      (taskId, itemId) => mutationKeys.updateChecklistItem(taskId, itemId),
+      updateChecklistItem,
+    ),
+    deleteChecklistItem: guard(
+      (taskId, itemId) => mutationKeys.deleteChecklistItem(taskId, itemId),
+      deleteChecklistItem,
+    ),
+    // Shares the update key because both are one patch of this item. The
+    // inner call runs against the raw function, so it cannot await itself.
+    toggleChecklistItem: guard(
+      (taskId, itemId) => mutationKeys.updateChecklistItem(taskId, itemId),
+      toggleChecklistItem,
+    ),
   };
 
   return {
     status,
     error,
     actionError,
+    isPending,
     retry,
     lists,
     tasks,
     taskQuery,
     setTaskQuery,
     taskActions,
-    addList,
-    renameList,
-    deleteList,
+    addList: guard(() => mutationKeys.createList(), addList),
+    renameList: guard((id) => mutationKeys.renameList(id), renameList),
+    deleteList: guard((id) => mutationKeys.deleteList(id), deleteList),
     selectedListId,
     setSelectedListId: setStoredSelected,
   };

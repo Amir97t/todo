@@ -67,7 +67,7 @@ function runInBackend(command, args, options = {}) {
 async function isHealthy() {
   try {
     const response = await fetch(`${API_BASE}/health`, {
-      signal: AbortSignal.timeout(2000),
+      signal: AbortSignal.timeout(4000),
     });
     return response.ok;
   } catch {
@@ -76,7 +76,9 @@ async function isHealthy() {
 }
 
 async function waitForBackend(child, captured) {
-  const deadline = Date.now() + 30_000;
+  // Generous: a cold start compiles Prisma's query engine and opens a
+  // connection pool, which is slow on a loaded machine.
+  const deadline = Date.now() + 60_000;
 
   while (Date.now() < deadline) {
     // Our own process exiting means someone else owns the port, so anything
@@ -90,7 +92,11 @@ async function waitForBackend(child, captured) {
     await delay(250);
   }
 
-  throw new Error(`Test backend never became healthy at ${LIVE_BASE_URL}.`);
+  throw new Error(
+    `Test backend never became healthy at ${LIVE_BASE_URL} after 60s ` +
+      `(exitCode=${child ? child.exitCode : "n/a"}, ` +
+      `stderr=${(captured.stderr || "<empty>").trim()})`,
+  );
 }
 
 async function resetToInboxOnly() {

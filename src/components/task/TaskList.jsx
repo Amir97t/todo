@@ -1,6 +1,12 @@
 import TaskItem from "./TaskItem";
 
-export default function TaskList({ tasks, taskActions, editingId, onStartEdit }) {
+export default function TaskList({
+  tasks,
+  taskActions,
+  editingId,
+  onStartEdit,
+  isPending,
+}) {
   if (tasks.length === 0) {
     return (
       <section className="mt-6">
@@ -19,6 +25,7 @@ export default function TaskList({ tasks, taskActions, editingId, onStartEdit })
             taskActions={taskActions}
             editingId={editingId}
             onStartEdit={onStartEdit}
+            isPending={isPending}
           />
         ))}
       </div>

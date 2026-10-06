@@ -9,6 +9,7 @@ import FilterBar from "../components/task/FilterBar";
 import EmptyState from "../components/common/EmptyState";
 import Sidebar from "../components/layout/Sidebar";
 import { buildTaskQuery } from "../lib/taskQuery";
+import { mutationKeys } from "../lib/mutationKeys";
 
 export default function Inbox({
   tasks,
@@ -19,6 +20,7 @@ export default function Inbox({
   addList,
   renameList,
   deleteList,
+  isPending,
   setTaskQuery,
   dataStatus = "ready",
   dataError = null,
@@ -45,7 +47,9 @@ export default function Inbox({
   }, [setTaskQuery, selectedListId, search, filter]);
 
   function handleAddTask(title, description, checklist) {
-    addTask(title, description, checklist, selectedListId);
+    // Returned so AddTaskCard can hold its dialog open while pending and only
+    // close once the task actually exists.
+    return addTask(title, description, checklist, selectedListId);
   }
   const selectedListName =
     lists.find((l) => l.id === selectedListId)?.name ?? "Inbox";
@@ -58,6 +62,7 @@ export default function Inbox({
         addList={addList}
         renameList={renameList}
         deleteList={deleteList}
+        isPending={isPending}
       />
       <main className="min-h-screen min-w-0 flex-1">
         <div className="w-full min-w-0 px-4 pb-10 sm:px-6 lg:px-8 lg:pt-8">
@@ -105,6 +110,7 @@ export default function Inbox({
                     onAddTask={handleAddTask}
                     open={islandOpen}
                     onOpenChange={setIslandOpen}
+                    pending={isPending(mutationKeys.createTask(selectedListId))}
                   />
                   <div className="space-y-4">
                     <div className="flex flex-col items-start gap-3">
@@ -133,6 +139,7 @@ export default function Inbox({
                         taskActions={taskActions}
                         editingId={editingId}
                         onStartEdit={setEditingId}
+                        isPending={isPending}
                       />
                     )}
                   </div>

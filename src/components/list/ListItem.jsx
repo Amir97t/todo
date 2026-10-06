@@ -5,6 +5,7 @@ import useInlineEditing from "../../hooks/useInlineEditing";
 import { Pencil, Trash2 } from "lucide-react";
 import { getSuggestedListIcon, LIST_ICON_OPTIONS } from "../../lib/listIcons";
 import { INBOX_LIST_ID } from "../../lib/constants";
+import { mutationKeys } from "../../lib/mutationKeys";
 import ListIcon from "../common/ListIcon";
 
 export default function ListItem({
@@ -17,6 +18,7 @@ export default function ListItem({
   onCancel,
   onDelete,
   collapsed,
+  isPending,
 }) {
   const { value: name, setValue: setName, startEditing } = useInlineEditing();
 
@@ -24,6 +26,8 @@ export default function ListItem({
 
   const isCurrentEditingList = editingId === list.id;
   const isInbox = list.id === INBOX_LIST_ID;
+  // Optional so an isolated render without the data layer still works.
+  const renaming = isPending?.(mutationKeys.renameList(list.id)) ?? false;
 
   const listIcon =
     list.icon ?? (isInbox ? "inbox" : getSuggestedListIcon(list.name));
@@ -174,7 +178,12 @@ export default function ListItem({
         </div>
 
         <div className="mt-3 flex gap-2">
-          <Button className="h-8 flex-1 text-xs" onClick={handleSave}>
+          <Button
+            className="h-8 flex-1 text-xs"
+            onClick={handleSave}
+            disabled={renaming}
+            aria-busy={renaming}
+          >
             Save
           </Button>
 

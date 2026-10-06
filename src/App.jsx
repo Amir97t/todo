@@ -7,6 +7,7 @@ export default function App() {
     status,
     error,
     retry,
+    isPending,
     lists,
     tasks,
     taskActions,
@@ -28,6 +29,7 @@ export default function App() {
         addList={addList}
         renameList={renameList}
         deleteList={deleteList}
+        isPending={isPending}
         selectedListId={selectedListId}
         setSelectedListId={setSelectedListId}
         setTaskQuery={setTaskQuery}

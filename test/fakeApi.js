@@ -223,6 +223,7 @@ export const fakeApi = {
 
   checklist: {
     create: async (taskId, body) => {
+      calls.push("checklist.create");
       findTask(taskId);
       const text = typeof body?.text === "string" ? body.text.trim() : "";
       if (!text) fail("text should not be empty", 400, "VALIDATION_ERROR");

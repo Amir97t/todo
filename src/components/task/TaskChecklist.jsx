@@ -9,6 +9,7 @@ export default function TaskChecklist({
   onToggle,
   onDelete,
   onEdit,
+  pending = false,
 }) {
   const [isAdding, setIsAdding] = useState(false);
   const [newText, setNewText] = useState("");
@@ -56,12 +57,17 @@ export default function TaskChecklist({
     return () => observer.disconnect();
   }, [updateScrollState]);
 
-  function handleAdd() {
+  async function handleAdd() {
     const text = newText.trim();
 
     if (!text) return;
 
-    onAdd(text);
+    // Awaited so the confirm button shows its busy state, and a rejected add
+    // does not throw away the text the user typed.
+    const saved = await onAdd(text);
+
+    if (!saved) return;
+
     setNewText("");
     setIsAdding(false);
   }
@@ -279,8 +285,10 @@ export default function TaskChecklist({
           <button
             type="button"
             onClick={handleAdd}
+            disabled={pending}
+            aria-busy={pending}
             aria-label="Add checklist item"
-            className="inline-flex h-7 w-7 shrink-0 items-center justify-center rounded-lg bg-(--primary) text-white transition-[filter] hover:brightness-105 focus-visible:ring-2 focus-visible:ring-(--primary)/30"
+            className="inline-flex h-7 w-7 shrink-0 items-center justify-center rounded-lg bg-(--primary) text-white transition-[filter] hover:brightness-105 focus-visible:ring-2 focus-visible:ring-(--primary)/30 disabled:pointer-events-none disabled:opacity-50"
           >
             <Check size={11} aria-hidden="true" />
           </button>

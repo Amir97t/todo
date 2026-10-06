@@ -2,12 +2,15 @@ import { useState, useRef, useEffect } from "react";
 import Button from "../ui/Button";
 import Input from "../ui/Input";
 import { getSuggestedListIcon, LIST_ICON_OPTIONS } from "../../lib/listIcons";
+import { mutationKeys } from "../../lib/mutationKeys";
 import ListIcon from "../common/ListIcon";
 
-export default function NewListForm({ onSave }) {
+export default function NewListForm({ onSave, isPending }) {
   const [isOpen, setIsOpen] = useState(false);
   const [name, setName] = useState("");
   const [iconOverride, setIconOverride] = useState(null);
+
+  const creating = isPending?.(mutationKeys.createList()) ?? false;
 
   const inputRef = useRef(null);
 
@@ -161,7 +164,13 @@ export default function NewListForm({ onSave }) {
       </div>
 
       <div className="flex gap-2">
-        <Button type="button" className="flex-1" onClick={handleSave}>
+        <Button
+          type="button"
+          className="flex-1"
+          onClick={handleSave}
+          disabled={creating}
+          aria-busy={creating}
+        >
           Save
         </Button>
 

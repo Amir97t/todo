@@ -15,6 +15,7 @@ import {
 import ListIcon from "../common/ListIcon";
 import { getSuggestedListIcon } from "../../lib/listIcons";
 import { INBOX_LIST_ID } from "../../lib/constants";
+import { mutationKeys } from "../../lib/mutationKeys";
 
 function ListsBlock({
   lists,
@@ -26,6 +27,7 @@ function ListsBlock({
   onCancel,
   onDelete,
   onAfterSelect,
+  isPending,
 }) {
   return (
     <div className="space-y-2">
@@ -44,6 +46,7 @@ function ListsBlock({
           onCancel={onCancel}
           onDelete={onDelete}
           collapsed={false}
+          isPending={isPending}
         />
       ))}
     </div>
@@ -57,6 +60,7 @@ export default function Sidebar({
   onSelect,
   renameList,
   deleteList,
+  isPending,
 }) {
   const [editingId, setEditingId] = useState(null);
   const [deleteTarget, setDeleteTarget] = useState(null);
@@ -251,6 +255,7 @@ export default function Sidebar({
                 onCancel={handleCancelEdit}
                 onDelete={setDeleteTarget}
                 onAfterSelect={() => setIsMobileOpen(false)}
+                isPending={isPending}
               />
             </div>
 
@@ -263,7 +268,7 @@ export default function Sidebar({
                   "color-mix(in srgb, var(--notebook-paper) 88%, transparent)",
               }}
             >
-              <NewListForm onSave={addList} />
+              <NewListForm onSave={addList} isPending={isPending} />
             </div>
           </div>
         </div>
@@ -474,6 +479,7 @@ export default function Sidebar({
                   onRename={handleRename}
                   onCancel={handleCancelEdit}
                   onDelete={setDeleteTarget}
+                  isPending={isPending}
                 />
 
                 <p
@@ -493,7 +499,7 @@ export default function Sidebar({
                     "color-mix(in srgb, var(--notebook-paper) 92%, transparent)",
                 }}
               >
-                <NewListForm onSave={addList} />
+                <NewListForm onSave={addList} isPending={isPending} />
               </div>
             </div>
           )}
@@ -507,14 +513,13 @@ export default function Sidebar({
           description="Choose what should happen to the tasks inside this list."
           onCancel={() => setDeleteTarget(null)}
           confirmLabel="Delete List"
-          onConfirm={() => {
-            deleteList(deleteTarget.id, false);
-            setDeleteTarget(null);
+          pending={isPending?.(mutationKeys.deleteList(deleteTarget.id)) ?? false}
+          onConfirm={async () => {
+            if (await deleteList(deleteTarget.id, false)) setDeleteTarget(null);
           }}
           secondaryLabel="Delete List & Tasks"
-          onSecondaryConfirm={() => {
-            deleteList(deleteTarget.id, true);
-            setDeleteTarget(null);
+          onSecondaryConfirm={async () => {
+            if (await deleteList(deleteTarget.id, true)) setDeleteTarget(null);
           }}
         />
       )}
