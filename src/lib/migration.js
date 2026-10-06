@@ -6,6 +6,50 @@ export const MIGRATION_VERSION = 1;
 const MIGRATION_KEY = "todo-app-migration";
 const LEGACY_LISTS_KEY = "todo-app-lists";
 const LEGACY_TASKS_KEY = "todo-app-tasks";
+// Exclusive across every tab of this origin, unlike module state below.
+const MIGRATION_LOCK_NAME = "todo-app-migration";
+
+// Level 1: one in-flight migration per JS runtime. StrictMode invokes the
+// mounting effect twice, and both callers must share a single pipeline rather
+// than each migrating the same legacy rows.
+let inFlight = null;
+
+function webLocks() {
+  const locks = globalThis.navigator && globalThis.navigator.locks;
+  return locks && typeof locks.request === "function" ? locks : null;
+}
+
+/**
+ * Runs the migration once per runtime, and at most once across tabs.
+ *
+ * Level 2 is mandatory rather than best-effort: two tabs do not share module
+ * memory, so without a cross-tab lock the duplicate-row race this guards
+ * against returns. Failing loudly is safe — nothing is written — whereas
+ * proceeding unlocked would silently corrupt the user's data.
+ */
+export function runMigration() {
+  if (inFlight) return inFlight;
+
+  inFlight = (async () => {
+    const locks = webLocks();
+
+    if (!locks) {
+      throw new MigrationError(
+        [
+          "This environment cannot lock migration across browser tabs",
+          "(navigator.locks is unavailable).",
+          "Close any other tabs of this app and reload to migrate.",
+        ].join(" "),
+      );
+    }
+
+    return locks.request(MIGRATION_LOCK_NAME, () => runMigrationPipeline());
+  })().finally(() => {
+    inFlight = null;
+  });
+
+  return inFlight;
+}
 
 export class MigrationError extends Error {
   constructor(message) {
@@ -208,7 +252,7 @@ async function assertNoConflict(serverLists, serverTasks, existingRecord) {
   return unclaimed;
 }
 
-export async function runMigration() {
+async function runMigrationPipeline() {
   const existing = readMigrationRecord();
 
   if (existing && existing.status === "done") {
