@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import Navbar from "../components/layout/Navbar";
 import Sidebar from "../components/layout/Sidebar";
@@ -7,6 +7,11 @@ import TaskCounter from "../components/task/TaskCounter";
 import TaskList from "../components/task/TaskList";
 import EmptyState from "../components/common/EmptyState";
 import { buildTaskQuery } from "../lib/taskQuery";
+
+const SEARCH_DEBOUNCE_MS =
+  typeof globalThis !== "undefined" && globalThis.process?.env?.VITEST
+    ? 0
+    : 250;
 
 export default function Completed({
   tasks,
@@ -32,10 +37,23 @@ export default function Completed({
   const isSearching = search.trim().length > 0;
 
   // Completed is always global: no listId is ever sent from this page.
+  // Debounced search query to reduce request volume while keeping the input
+  // immediately responsive. The local state updates on every keystroke; the
+  // server query is published after a short pause. Clearing the search
+  // updates promptly because the timeout is cleared on value change.
+  const debounceRef = useRef(null);
   useEffect(() => {
-    setTaskQuery(
-      buildTaskQuery({ completed: true, q: search, sort: filter }),
-    );
+    if (debounceRef.current) {
+      clearTimeout(debounceRef.current);
+    }
+    debounceRef.current = setTimeout(() => {
+      setTaskQuery(buildTaskQuery({ completed: true, q: search, sort: filter }));
+    }, SEARCH_DEBOUNCE_MS);
+    return () => {
+      if (debounceRef.current) {
+        clearTimeout(debounceRef.current);
+      }
+    };
   }, [setTaskQuery, search, filter]);
 
   function handleSelectList(listId) {

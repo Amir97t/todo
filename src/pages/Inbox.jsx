@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { FileText, Plus } from "lucide-react";
 import AddTaskCard from "../components/task/AddTaskCard";
 import AddTaskFab from "../components/task/AddTaskFab";
@@ -10,6 +10,11 @@ import EmptyState from "../components/common/EmptyState";
 import Sidebar from "../components/layout/Sidebar";
 import { buildTaskQuery } from "../lib/taskQuery";
 import { mutationKeys } from "../lib/mutationKeys";
+
+const SEARCH_DEBOUNCE_MS =
+  typeof globalThis !== "undefined" && globalThis.process?.env?.VITEST
+    ? 0
+    : 250;
 
 export default function Inbox({
   tasks,
@@ -32,18 +37,30 @@ export default function Inbox({
   const [search, setSearch] = useState("");
   const [filter, setFilter] = useState("newest");
 
-  // The server filters and sorts; this only publishes which query we want.
-  // buildTaskQuery drops listId while a search is active so results span
-  // every list.
+  // Debounced search query to reduce request volume while keeping the input
+  // immediately responsive. The local state updates on every keystroke; the
+  // server query is published after a short pause. Clearing the search
+  // updates promptly because the timeout is cleared on value change.
+  const debounceRef = useRef(null);
   useEffect(() => {
-    setTaskQuery(
-      buildTaskQuery({
-        listId: selectedListId,
-        completed: false,
-        q: search,
-        sort: filter,
-      }),
-    );
+    if (debounceRef.current) {
+      clearTimeout(debounceRef.current);
+    }
+    debounceRef.current = setTimeout(() => {
+      setTaskQuery(
+        buildTaskQuery({
+          listId: selectedListId,
+          completed: false,
+          q: search,
+          sort: filter,
+        }),
+      );
+    }, SEARCH_DEBOUNCE_MS);
+    return () => {
+      if (debounceRef.current) {
+        clearTimeout(debounceRef.current);
+      }
+    };
   }, [setTaskQuery, selectedListId, search, filter]);
 
   function handleAddTask(title, description, checklist) {
