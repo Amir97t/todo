@@ -342,10 +342,13 @@ describe("migration record lifecycle", () => {
     }
   });
 
-  it("marks a fresh install done without migrating anything", async () => {
-    await runMigration();
+  it("treats a fresh install as nothing to migrate and writes no record", async () => {
+    // Nothing exists to migrate, so there is nothing to write and no reason
+    // to invent migration history for it.
+    const result = await runMigration();
 
-    expect(record().status).toBe("done");
+    expect(result.skipped).toBe(true);
+    expect(record()).toBeNull();
     expect(db.lists).toHaveLength(1);
     expect(db.tasks).toHaveLength(0);
   });

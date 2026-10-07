@@ -273,6 +273,21 @@ async function runMigrationPipeline() {
   const legacyTasks = rawTasks ?? [];
   const hasLegacyData = rawLists !== null || rawTasks !== null;
 
+  // State A: no record and no row that actually needs migrating (the legacy
+  // Inbox sentinel maps onto the row the backend already seeds). There would
+  // be nothing to write, so there is nothing for conflict detection to
+  // protect — running it here would refuse to load a fresh browser against a
+  // populated server. Malformed legacy data still failed above, and any row
+  // that does need migrating falls through to the conflict check below.
+  const migratableLists = legacyLists.filter((list) => list.id !== "inbox");
+  if (
+    !existing &&
+    migratableLists.length === 0 &&
+    legacyTasks.length === 0
+  ) {
+    return { skipped: true };
+  }
+
   const serverLists = await listsApi.get();
   const serverTasks = await tasksApi.get();
 
