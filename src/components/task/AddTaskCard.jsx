@@ -1,4 +1,4 @@
-import { useEffect, useId, useRef, useState } from "react";
+import { useId, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 import { Check, ListPlus, Plus, Sparkles, Trash2, X } from "lucide-react";
 
@@ -12,6 +12,7 @@ import {
   CardContent,
   CardFooter,
 } from "../ui/Card";
+import useDialogFocus from "../../hooks/useDialogFocus";
 
 function AddTaskDialog({ open, onClose, onAddTask, pending = false }) {
   const [title, setTitle] = useState("");
@@ -24,27 +25,15 @@ function AddTaskDialog({ open, onClose, onAddTask, pending = false }) {
   const dialogRef = useRef(null);
   const titleId = useId();
 
-  useEffect(() => {
-    if (!open) return;
-
-    const previousActiveElement = document.activeElement;
-    const previousOverflow = document.body.style.overflow;
-
-    document.body.style.overflow = "hidden";
-
-    const frame = requestAnimationFrame(() => {
-      titleRef.current?.focus();
-    });
-
-    return () => {
-      cancelAnimationFrame(frame);
-      document.body.style.overflow = previousOverflow;
-
-      if (previousActiveElement instanceof HTMLElement) {
-        previousActiveElement.focus();
-      }
-    };
-  }, [open]);
+  // Focus in on the title, keep Tab inside, close on Escape and return focus
+  // to the opener — the same contract ConfirmDialog uses.
+  const { handleKeyDown } = useDialogFocus({
+    open,
+    dialogRef,
+    initialFocusRef: titleRef,
+    onEscape: handleClose,
+    lockScroll: true,
+  });
 
   function resetForm() {
     setTitle("");
@@ -57,42 +46,6 @@ function AddTaskDialog({ open, onClose, onAddTask, pending = false }) {
   function handleClose() {
     resetForm();
     onClose();
-  }
-
-  function handleDialogKeyDown(event) {
-    if (event.key === "Escape") {
-      if (event.defaultPrevented) return;
-
-      event.preventDefault();
-      handleClose();
-      return;
-    }
-
-    if (event.key !== "Tab") return;
-
-    const dialog = dialogRef.current;
-
-    if (!dialog) return;
-
-    const focusableElements = dialog.querySelectorAll(
-      'button:not([disabled]), input:not([disabled]), textarea:not([disabled]), select:not([disabled]), [tabindex]:not([tabindex="-1"])',
-    );
-
-    if (!focusableElements.length) return;
-
-    const firstElement = focusableElements[0];
-    const lastElement = focusableElements[focusableElements.length - 1];
-
-    if (event.shiftKey && document.activeElement === firstElement) {
-      event.preventDefault();
-      lastElement.focus();
-      return;
-    }
-
-    if (!event.shiftKey && document.activeElement === lastElement) {
-      event.preventDefault();
-      firstElement.focus();
-    }
   }
 
   function handleAddItem() {
@@ -164,7 +117,7 @@ function AddTaskDialog({ open, onClose, onAddTask, pending = false }) {
         role="dialog"
         aria-modal="true"
         aria-labelledby={titleId}
-        onKeyDown={handleDialogKeyDown}
+        onKeyDown={handleKeyDown}
         onSubmit={handleSubmit}
         className="relative w-full max-w-130 overflow-hidden rounded-[20px] border bg-(--bg-elevated) shadow-[0_24px_64px_rgba(0,0,0,0.22),0_4px_16px_rgba(0,0,0,0.12)]"
         style={{

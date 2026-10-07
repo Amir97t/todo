@@ -1,8 +1,9 @@
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import ListItem from "../list/ListItem";
 import NewListForm from "../list/NewListForm";
 import ConfirmDialog from "../common/ConfirmDialog";
 import useLocalStorage from "../../hooks/useLocalStorage";
+import useDialogFocus from "../../hooks/useDialogFocus";
 import {
   BookMarked,
   BookOpen,
@@ -120,6 +121,17 @@ export default function Sidebar({
     setEditingId(null);
   }
 
+  const drawerRef = useRef(null);
+
+  // The drawer stays mounted so it can animate; `inert` removes it from the
+  // tab order and the accessibility tree while closed, and this hands focus
+  // in on open and back to the trigger on close.
+  const { handleKeyDown } = useDialogFocus({
+    open: isMobileOpen,
+    dialogRef: drawerRef,
+    onEscape: () => setIsMobileOpen(false),
+  });
+
   return (
     <>
       {/* Mobile top bar trigger */}
@@ -150,10 +162,13 @@ export default function Sidebar({
 
       {/* Mobile drawer */}
       <div
+        ref={drawerRef}
         className={`fixed inset-y-0 left-0 z-50 flex w-[88%] max-w-[320px] flex-col transition-[transform,opacity] duration-300 lg:hidden ${
           isMobileOpen ? "translate-x-0" : "-translate-x-full"
         }`}
         aria-hidden={!isMobileOpen}
+        inert={!isMobileOpen}
+        onKeyDown={handleKeyDown}
       >
         <div className="wood-texture relative flex h-full flex-col overflow-hidden rounded-r-[18px] p-2.5 shadow-[0_20px_60px_rgba(0,0,0,0.5),0_2px_10px_rgba(0,0,0,0.35)]">
           {/* Book edge highlight */}

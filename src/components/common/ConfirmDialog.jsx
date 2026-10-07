@@ -1,5 +1,7 @@
+import { useRef } from "react";
 import Button from "../ui/Button";
 import { AlertTriangle } from "lucide-react";
+import useDialogFocus from "../../hooks/useDialogFocus";
 
 export default function ConfirmDialog({
   open,
@@ -12,10 +14,24 @@ export default function ConfirmDialog({
   onCancel,
   pending = false,
 }) {
+  const dialogRef = useRef(null);
+  const confirmRef = useRef(null);
+
+  // Registered before the early return: hooks must run unconditionally.
+  const { handleKeyDown } = useDialogFocus({
+    open,
+    dialogRef,
+    initialFocusRef: confirmRef,
+    onEscape: onCancel,
+  });
+
   if (!open) return null;
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4 backdrop-blur-sm">
+    <div
+      className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4 backdrop-blur-sm"
+      onKeyDown={handleKeyDown}
+    >
       <button
         type="button"
         aria-label="Close dialog"
@@ -23,6 +39,7 @@ export default function ConfirmDialog({
         className="absolute inset-0"
       />
       <div
+        ref={dialogRef}
         role="dialog"
         aria-modal="true"
         aria-labelledby="confirm-dialog-title"
@@ -33,7 +50,7 @@ export default function ConfirmDialog({
         }}
       >
         <div className="mb-4 flex h-10 w-10 items-center justify-center rounded-xl bg-red-50 text-red-600 dark:bg-red-950/40 dark:text-red-400">
-          <AlertTriangle size={18} />
+          <AlertTriangle size={18} aria-hidden="true" />
         </div>
         <h2
           id="confirm-dialog-title"
@@ -65,6 +82,7 @@ export default function ConfirmDialog({
             </Button>
           )}
           <Button
+            ref={confirmRef}
             type="button"
             variant="danger"
             onClick={onConfirm}
