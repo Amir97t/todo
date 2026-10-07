@@ -1,6 +1,7 @@
 import Router from "./routes/Router";
 import useAppData from "./hooks/useAppData";
 import CelestialBackground from "./components/common/CelestialBackground";
+import MutationErrorBanner from "./components/common/MutationErrorBanner";
 
 export default function App() {
   const {
@@ -8,6 +9,8 @@ export default function App() {
     error,
     retry,
     isPending,
+    actionError,
+    clearActionError,
     lists,
     tasks,
     taskActions,
@@ -22,6 +25,7 @@ export default function App() {
   return (
     <>
       <CelestialBackground />
+      <MutationErrorBanner message={actionError} onDismiss={clearActionError} />
       <Router
         tasks={tasks}
         taskActions={taskActions}

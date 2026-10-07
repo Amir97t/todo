@@ -7,6 +7,7 @@ import {
 import { INBOX_LIST_ID } from "../lib/constants.js";
 import { readMigrationRecord, runMigration } from "../lib/migration.js";
 import { mutationKeys } from "../lib/mutationKeys.js";
+import { userMessageFor } from "../lib/errorMessages.js";
 import useLocalStorage from "./useLocalStorage.js";
 
 const LEGACY_LISTS_KEY = "todo-app-lists";
@@ -111,6 +112,9 @@ export default function useAppData() {
     if (existing) return existing;
 
     const promise = (async () => {
+      // Only an actual execution clears: a blocked duplicate returns above, so
+      // it neither fakes an error nor wipes a real one.
+      setActionError(null);
       try {
         return await run();
       } finally {
@@ -234,6 +238,10 @@ export default function useAppData() {
     setTaskVersion((version) => version + 1);
   }
 
+  function clearActionError() {
+    setActionError(null);
+  }
+
   // A mutation can move a task out of the active query (toggling completed,
   // changing list, deleting a list's tasks). With client-side filtering gone
   // the rendered array must come back from the server to stay truthful.
@@ -262,7 +270,7 @@ export default function useAppData() {
       setStoredSelected(created.id);
       return true;
     } catch (cause) {
-      setActionError(messageOf(cause));
+      setActionError(userMessageFor(cause));
       return false;
     }
   }
@@ -281,7 +289,7 @@ export default function useAppData() {
       setLists((prev) => prev.map((list) => (list.id === id ? updated : list)));
       return true;
     } catch (cause) {
-      setActionError(messageOf(cause));
+      setActionError(userMessageFor(cause));
       return false;
     }
   }
@@ -300,7 +308,7 @@ export default function useAppData() {
       refreshTasks();
       return true;
     } catch (cause) {
-      setActionError(messageOf(cause));
+      setActionError(userMessageFor(cause));
       return false;
     }
   }
@@ -326,7 +334,7 @@ export default function useAppData() {
       refreshTasks();
       return true;
     } catch (cause) {
-      setActionError(messageOf(cause));
+      setActionError(userMessageFor(cause));
       return false;
     }
   }
@@ -341,7 +349,7 @@ export default function useAppData() {
       refreshTasks();
       return true;
     } catch (cause) {
-      setActionError(messageOf(cause));
+      setActionError(userMessageFor(cause));
       return false;
     }
   }
@@ -360,7 +368,7 @@ export default function useAppData() {
       refreshTasks();
       return true;
     } catch (cause) {
-      setActionError(messageOf(cause));
+      setActionError(userMessageFor(cause));
       return false;
     }
   }
@@ -386,7 +394,7 @@ export default function useAppData() {
       refreshTasks();
       return true;
     } catch (cause) {
-      setActionError(messageOf(cause));
+      setActionError(userMessageFor(cause));
       return false;
     }
   }
@@ -408,7 +416,7 @@ export default function useAppData() {
       );
       return true;
     } catch (cause) {
-      setActionError(messageOf(cause));
+      setActionError(userMessageFor(cause));
       return false;
     }
   }
@@ -433,7 +441,7 @@ export default function useAppData() {
       );
       return true;
     } catch (cause) {
-      setActionError(messageOf(cause));
+      setActionError(userMessageFor(cause));
       return false;
     }
   }
@@ -467,7 +475,7 @@ export default function useAppData() {
       );
       return true;
     } catch (cause) {
-      setActionError(messageOf(cause));
+      setActionError(userMessageFor(cause));
       return false;
     }
   }
@@ -504,6 +512,7 @@ export default function useAppData() {
     status,
     error,
     actionError,
+    clearActionError,
     isPending,
     retry,
     lists,
