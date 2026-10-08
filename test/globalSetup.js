@@ -145,7 +145,7 @@ export default async function globalSetup() {
   }
 
   const applied = runInBackend("npx", ["prisma", "migrate", "deploy"], {
-    env: { ...process.env, DATABASE_URL: databaseUrl },
+    env: { ...process.env, DATABASE_URL: databaseUrl, DIRECT_URL: databaseUrl },
   });
   if (applied.status !== 0) {
     throw new Error(
