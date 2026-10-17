@@ -92,7 +92,7 @@ function runInBackend(command, args, options = {}) {
 async function isHealthy() {
   try {
     const response = await fetch(`${API_BASE}/health`, {
-      signal: AbortSignal.timeout(4000),
+      signal: AbortSignal.timeout(10_000),
     });
     return response.ok;
   } catch {
@@ -130,17 +130,22 @@ async function waitForBackend(child, captured) {
     // Our own process exiting means someone else owns the port, so anything
     // answering now is a server whose database we cannot verify.
     if (child && child.exitCode !== null) {
+      const diagnostics = [
+        captured.stdout.trim() && `stdout: ${redactUrl(captured.stdout.trim())}`,
+        captured.stderr.trim() && `stderr: ${redactUrl(captured.stderr.trim())}`,
+      ].filter(Boolean).join("\\n");
       throw new Error(
-        `Test backend exited with code ${child.exitCode}: ${redactUrl(captured.stderr.trim())}`,
+        `Test backend exited with code ${child.exitCode}: ${diagnostics || "<no process output>"}`,
       );
     }
     if (await isHealthy()) return;
-    await delay(250);
+    await delay(500);
   }
 
   throw new Error(
     `Test backend never became healthy at ${LIVE_BASE_URL} after 60s ` +
       `(exitCode=${child ? child.exitCode : "n/a"}, ` +
+      `stdout=${redactUrl((captured.stdout || "<empty>").trim())}, ` +
       `stderr=${redactUrl((captured.stderr || "<empty>").trim())})`,
   );
 }
@@ -236,7 +241,10 @@ export default async function globalSetup() {
   }
 
   let child = null;
-  const captured = { stderr: "" };
+  const captured = { stdout: "", stderr: "" };
+  const capture = (stream, chunk) => {
+    captured[stream] = (captured[stream] + chunk.toString()).slice(-12_000);
+  };
   // Use a process-local test-only secret; never borrow a production JWT secret.
   const testJwtSecret =
     process.env.TEST_JWT_SECRET || randomBytes(32).toString("hex");
@@ -256,11 +264,10 @@ export default async function globalSetup() {
       REQUIRE_AUTH: "off",
       RATE_LIMIT: "off",
     },
-    stdio: ["ignore", "ignore", "pipe"],
+    stdio: ["ignore", "pipe", "pipe"],
   });
-  child.stderr.on("data", (chunk) => {
-    captured.stderr += chunk.toString();
-  });
+  child.stdout.on("data", (chunk) => capture("stdout", chunk));
+  child.stderr.on("data", (chunk) => capture("stderr", chunk));
 
   try {
     await waitForBackend(child, captured);
