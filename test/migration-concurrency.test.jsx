@@ -158,7 +158,7 @@ vi.mock("../src/lib/authSession.js", async () => {
   return { ...actual, getAccessTokenSubject: () => "test-user" };
 });
 
-vi.mock("../src/context/AuthProvider.jsx", () => ({
+vi.mock("../src/context/AuthContext.js", () => ({
   useAuth: () => ({
     status: "authenticated",
     isAuthenticated: true,
