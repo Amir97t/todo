@@ -2,6 +2,7 @@ import { afterEach, describe, expect, it, vi } from "vitest";
 import {
   clearAccessToken,
   getAccessToken,
+  getAccessTokenSubject,
   setAccessToken,
   subscribeToAuthToken,
 } from "./authSession.js";
@@ -49,6 +50,21 @@ describe("in-memory access-token state", () => {
     unsubscribe();
 
     expect(listener).not.toHaveBeenCalled();
+  });
+
+  it("extracts the JWT subject for local migration scoping only", () => {
+    const payload = btoa(JSON.stringify({ sub: "user-123" }))
+      .replace(/=/g, "")
+      .replace(/\\+/g, "-")
+      .replace(/\\//g, "_");
+    setAccessToken(`header.${payload}.signature`);
+
+    expect(getAccessTokenSubject()).toBe("user-123");
+  });
+
+  it("returns null for a token without a valid JWT subject", () => {
+    setAccessToken("not-a-jwt");
+    expect(getAccessTokenSubject()).toBeNull();
   });
 
   it("allows subscribers to unsubscribe", () => {
