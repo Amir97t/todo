@@ -218,7 +218,10 @@ export default async function globalSetup() {
     }
   }
 
-  const applied = runInBackend("npx", ["prisma", "migrate", "deploy"], {
+  const applied = runInBackend(
+    "npx",
+    ["prisma", "migrate", "deploy", "--config", "prisma7.config.ts"],
+    {
     env: {
       ...process.env,
       TEST_DATABASE_URL: databaseUrl,
