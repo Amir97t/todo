@@ -13,7 +13,7 @@ const MIGRATION_LOCK_NAME = "todo-app-migration";
 // Level 1: one in-flight migration per JS runtime. StrictMode invokes the
 // mounting effect twice, and both callers must share a single pipeline rather
 // than each migrating the same legacy rows.
-let inFlight = null;
+const inFlight = new Map();
 
 function webLocks() {
   const locks = globalThis.navigator && globalThis.navigator.locks;
@@ -32,9 +32,9 @@ export function runMigration(userId) {
   if (typeof userId !== "string" || userId.length === 0) {
     return Promise.reject(new MigrationError("A signed-in account is required before migrating local data."));
   }
-  if (inFlight) return inFlight;
+  if (inFlight.has(userId)) return inFlight.get(userId);
 
-  inFlight = (async () => {
+  const migrationPromise = (async () => {
     const locks = webLocks();
 
     if (!locks) {
@@ -49,10 +49,11 @@ export function runMigration(userId) {
 
     return locks.request(MIGRATION_LOCK_NAME, () => runMigrationPipeline(userId));
   })().finally(() => {
-    inFlight = null;
+    if (inFlight.get(userId) === migrationPromise) inFlight.delete(userId);
   });
 
-  return inFlight;
+  inFlight.set(userId, migrationPromise);
+  return migrationPromise;
 }
 
 export class MigrationError extends Error {
