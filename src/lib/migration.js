@@ -4,6 +4,7 @@ import { INBOX_LIST_ID } from "./constants.js";
 export const MIGRATION_VERSION = 1;
 
 const MIGRATION_KEY = "todo-app-migration";
+const LEGACY_OWNER_KEY = "todo-app-legacy-owner";
 const LEGACY_LISTS_KEY = "todo-app-lists";
 const LEGACY_TASKS_KEY = "todo-app-tasks";
 // Exclusive across every tab of this origin, unlike module state below.
@@ -27,7 +28,10 @@ function webLocks() {
  * against returns. Failing loudly is safe — nothing is written — whereas
  * proceeding unlocked would silently corrupt the user's data.
  */
-export function runMigration() {
+export function runMigration(userId) {
+  if (typeof userId !== "string" || userId.length === 0) {
+    return Promise.reject(new MigrationError("A signed-in account is required before migrating local data."));
+  }
   if (inFlight) return inFlight;
 
   inFlight = (async () => {
@@ -43,7 +47,7 @@ export function runMigration() {
       );
     }
 
-    return locks.request(MIGRATION_LOCK_NAME, () => runMigrationPipeline());
+    return locks.request(MIGRATION_LOCK_NAME, () => runMigrationPipeline(userId));
   })().finally(() => {
     inFlight = null;
   });
@@ -252,8 +256,20 @@ async function assertNoConflict(serverLists, serverTasks, existingRecord) {
   return unclaimed;
 }
 
-async function runMigrationPipeline() {
-  const existing = readMigrationRecord();
+async function runMigrationPipeline(userId) {
+  const existing = readMigrationRecord(userId);
+  const legacyOwner = localStorage.getItem(LEGACY_OWNER_KEY);
+  const legacyRecord = readMigrationRecord();
+
+  // Never import the same browser-local dataset into a different account.
+  // The old unscoped migration record cannot prove which account owns it, so
+  // preserve the legacy rows and load the current account server data only.
+  if (legacyOwner && legacyOwner !== userId) {
+    return { skipped: true, reason: "legacy-data-belongs-to-another-account" };
+  }
+  if (existing === null && legacyRecord !== null) {
+    return { skipped: true, reason: "legacy-migration-record-needs-review" };
+  }
 
   if (existing && existing.status === "done") {
     return { skipped: true };
@@ -293,6 +309,12 @@ async function runMigrationPipeline() {
 
   const unclaimed = await assertNoConflict(serverLists, serverTasks, existing);
 
+  if (hasLegacyData && !legacyOwner) {
+    // Reserve before the first write. If migration fails midway, only this
+    // same account may resume it; another account cannot adopt the leftovers.
+    localStorage.setItem(LEGACY_OWNER_KEY, userId);
+  }
+
   const record = existing ?? {
     version: MIGRATION_VERSION,
     status: "running",
@@ -301,12 +323,12 @@ async function runMigrationPipeline() {
   };
 
   if (existing === null) {
-    writeRecord({ ...record, status: "running" });
+    writeRecord(userId, { ...record, status: "running" });
   }
 
   if (!hasLegacyData) {
     const done = { ...record, status: "done" };
-    writeRecord(done);
+    writeRecord(userId, done);
     return { fresh: true, record: done };
   }
 
@@ -342,7 +364,7 @@ async function runMigrationPipeline() {
       if (candidates.length === 1) {
         listIdMap[list.id] = candidates[0].id;
         adopted.add(candidates[0].id);
-        writeRecord({ ...record, status: "running", listIdMap, migratedTaskIds });
+        writeRecord(userId, { ...record, status: "running", listIdMap, migratedTaskIds });
         continue;
       }
       if (candidates.length > 1) {
@@ -363,7 +385,7 @@ async function runMigrationPipeline() {
     );
 
     listIdMap[list.id] = created.id;
-    writeRecord({ ...record, status: "running", listIdMap, migratedTaskIds });
+    writeRecord(userId, { ...record, status: "running", listIdMap, migratedTaskIds });
   }
 
   // Any still-unclaimed server list after adoption is unknown data.
@@ -420,7 +442,7 @@ async function runMigrationPipeline() {
 
     migratedTaskIds.push(task.id);
     createdThisRun.push({ legacyId: task.id, serverId: created.id, legacy: task });
-    writeRecord({ ...record, status: "running", listIdMap, migratedTaskIds });
+    writeRecord(userId, { ...record, status: "running", listIdMap, migratedTaskIds });
   }
 
   // ---- Phase 4: verify before declaring done ----
@@ -439,7 +461,7 @@ async function runMigrationPipeline() {
     listIdMap,
     migratedTaskIds,
   };
-  writeRecord(done);
+  writeRecord(userId, done);
 
   return { record: done, createdThisRun };
 }
