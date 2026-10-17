@@ -4,6 +4,8 @@ import { INBOX_LIST_ID } from "../src/lib/constants.js";
 import { readMigrationRecord, runMigration } from "../src/lib/migration.js";
 import { LIVE_BASE_URL } from "./liveBackend.js";
 
+const TEST_USER_ID = "test-user";
+
 // globalSetup() already booted a backend here against todo_test and reset it
 // to Inbox-only. Pointing the API client away from todo_dev is what keeps the
 // shared development database and its unknown rows untouched.
@@ -92,7 +94,7 @@ describe.runIf(backend)("live migration against the running backend", () => {
 
     const listsBefore = await listsApi.get();
 
-    const result = await runMigration();
+    const result = await runMigration(TEST_USER_ID);
     expect(result.record.status).toBe("done");
 
     const listsAfter = await listsApi.get();
@@ -101,7 +103,7 @@ describe.runIf(backend)("live migration against the running backend", () => {
     expect(created).toBeTruthy();
     createdListIds.push(created.id);
 
-    const record = readMigrationRecord();
+    const record = readMigrationRecord(TEST_USER_ID);
     expect(record.listIdMap[legacyListId]).toBe(created.id);
     expect(record.listIdMap.inbox).toBe(INBOX_LIST_ID);
     expect(record.migratedTaskIds).toEqual([`legacy-task-${marker}`]);
@@ -134,7 +136,7 @@ describe.runIf(backend)("live migration against the running backend", () => {
     // Kept in the same test: the shared setup clears localStorage between
     // tests, so a second call here would look like a brand new migration.
     const listsBeforeSecondRun = await listsApi.get();
-    const second = await runMigration();
+    const second = await runMigration(TEST_USER_ID);
 
     expect(second.skipped).toBe(true);
     expect(await listsApi.get()).toHaveLength(listsBeforeSecondRun.length);
