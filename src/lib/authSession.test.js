@@ -55,8 +55,8 @@ describe("in-memory access-token state", () => {
   it("extracts the JWT subject for local migration scoping only", () => {
     const payload = btoa(JSON.stringify({ sub: "user-123" }))
       .replace(/=/g, "")
-      .replace(/\\+/g, "-")
-      .replace(/\\//g, "_");
+      .replace(/\+/g, "-")
+      .replace(/\//g, "_");
     setAccessToken(`header.${payload}.signature`);
 
     expect(getAccessTokenSubject()).toBe("user-123");
