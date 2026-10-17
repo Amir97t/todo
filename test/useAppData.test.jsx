@@ -184,3 +184,9 @@ describe("store switch", () => {
     expect(result.current.status).toBe("ready");
   });
 });
+
+
+vi.mock("../src/lib/authSession.js", async () => {
+  const actual = await vi.importActual("../src/lib/authSession.js");
+  return { ...actual, getAccessTokenSubject: () => "test-user" };
+});
