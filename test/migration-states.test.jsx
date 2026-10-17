@@ -156,7 +156,7 @@ describe("State D — resumable migration", () => {
       { id: "legacy-b", name: "Beta", icon: "folder" },
     ]);
     localStorage.setItem(
-      "todo-app-migration",
+      "todo-app-migration:test-user",
       JSON.stringify({
         version: 1,
         status: "running",
