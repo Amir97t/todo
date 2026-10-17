@@ -1,8 +1,8 @@
+import { clearAccessToken, getAccessToken, setAccessToken } from "./authSession.js";
+
 const API_PREFIX = "/api/v1";
 const DEFAULT_BASE_URL = "http://localhost:3000";
 const DEFAULT_TIMEOUT_MS = 15000;
-
-import { clearAccessToken, getAccessToken, setAccessToken } from "./authSession.js";
 
 /**
  * Every backend failure — validation, domain or transport — is surfaced to
