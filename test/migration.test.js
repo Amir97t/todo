@@ -50,6 +50,27 @@ beforeEach(() => {
   reset();
 });
 
+describe("account-scoped legacy migration", () => {
+  it("does not import one browser's legacy rows into a second account", async () => {
+    seedLists([listRow({ id: "private-legacy-list" })]);
+    seedTasks([taskRow({ id: "private-legacy-task", listId: "private-legacy-list" })]);
+
+    await runMigration(TEST_USER_ID);
+    const writesAfterOwner = [...calls];
+
+    const secondAccountResult = await runMigration("another-user");
+
+    expect(secondAccountResult).toMatchObject({
+      skipped: true,
+      reason: "legacy-data-belongs-to-another-account",
+    });
+    expect(calls).toEqual(writesAfterOwner);
+    expect(readMigrationRecord("another-user")).toBeNull();
+    expect(localStorage.getItem(LISTS_KEY)).not.toBeNull();
+    expect(localStorage.getItem(TASKS_KEY)).not.toBeNull();
+  });
+});
+
 describe("list migration", () => {
   it("maps the legacy Inbox to the fixed UUID without posting it", async () => {
     seedLists([
