@@ -8,6 +8,8 @@ import {
 import { INBOX_LIST_ID } from "../src/lib/constants.js";
 import { calls, db, reset } from "./fakeApi.js";
 
+const TEST_USER_ID = "test-user";
+
 vi.mock("../src/lib/api.js", async () => {
   const { fakeApi } = await import("./fakeApi.js");
   return fakeApi;
@@ -24,7 +26,7 @@ function seedTasks(rows) {
   localStorage.setItem(TASKS_KEY, JSON.stringify(rows));
 }
 
-const record = () => readMigrationRecord();
+const record = () => readMigrationRecord(TEST_USER_ID);
 
 function listRow(overrides = {}) {
   return { id: "l1", name: "Work", icon: "briefcase", ...overrides };
@@ -55,7 +57,7 @@ describe("list migration", () => {
       listRow(),
     ]);
 
-    await runMigration();
+    await runMigration(TEST_USER_ID);
 
     expect(record().listIdMap.inbox).toBe(INBOX_LIST_ID);
     // The server Inbox already existed, so nothing new was created for it.
@@ -72,7 +74,7 @@ describe("list migration", () => {
       listRow({ id: "legacy-b", name: "Beta", icon: null }),
     ]);
 
-    await runMigration();
+    await runMigration(TEST_USER_ID);
 
     const map = record().listIdMap;
     expect(map.inbox).toBe(INBOX_LIST_ID);
@@ -92,7 +94,7 @@ describe("list migration", () => {
       listRow({ id: "legacy-a", name: "Alpha" }),
     ]);
 
-    await runMigration();
+    await runMigration(TEST_USER_ID);
 
     expect(db.lists.some((list) => list.id === "legacy-a")).toBe(false);
   });
@@ -104,7 +106,7 @@ describe("list migration", () => {
     ]);
     seedTasks([taskRow({ listId: "legacy-a" })]);
 
-    await runMigration();
+    await runMigration(TEST_USER_ID);
 
     expect(calls.indexOf("lists.create")).toBeLessThan(
       calls.indexOf("tasks.create"),
@@ -117,7 +119,7 @@ describe("list migration", () => {
       { id: "broken", name: 42 },
     ]);
 
-    await expect(runMigration()).rejects.toBeInstanceOf(MigrationError);
+    await expect(runMigration(TEST_USER_ID)).rejects.toBeInstanceOf(MigrationError);
     expect(record()?.status).not.toBe("done");
   });
 });
@@ -129,7 +131,7 @@ describe("task migration", () => {
       listRow({ id: "legacy-a", name: "Alpha" }),
     ]);
     seedTasks([task]);
-    await runMigration();
+    await runMigration(TEST_USER_ID);
     return db.tasks[0];
   }
 
@@ -212,7 +214,7 @@ describe("task migration", () => {
       taskRow({ id: "t2", listId: "legacy-a", title: "Same", createdAt: 1700000000000 }),
     ]);
 
-    await runMigration();
+    await runMigration(TEST_USER_ID);
 
     // Identity is the legacy id, never a content fingerprint.
     expect(db.tasks).toHaveLength(2);
@@ -251,7 +253,7 @@ describe("task migration", () => {
     seedLists([{ id: "inbox", name: "Inbox", icon: "inbox" }]);
     seedTasks([taskRow({ listId: "ghost" })]);
 
-    await expect(runMigration()).rejects.toBeInstanceOf(MigrationError);
+    await expect(runMigration(TEST_USER_ID)).rejects.toBeInstanceOf(MigrationError);
     expect(record()?.status).not.toBe("done");
   });
 });
@@ -263,12 +265,12 @@ describe("migration record lifecycle", () => {
       listRow(),
     ]);
 
-    await runMigration();
+    await runMigration(TEST_USER_ID);
     const firstRecord = record();
     expect(firstRecord.status).toBe("done");
 
     const before = db.lists.length;
-    await runMigration();
+    await runMigration(TEST_USER_ID);
 
     expect(db.lists).toHaveLength(before);
     expect(record()).toEqual(firstRecord);
@@ -285,7 +287,7 @@ describe("migration record lifecycle", () => {
     const listsBefore = localStorage.getItem(LISTS_KEY);
     const tasksBefore = localStorage.getItem(TASKS_KEY);
 
-    await runMigration();
+    await runMigration(TEST_USER_ID);
 
     expect(localStorage.getItem(LISTS_KEY)).toBe(listsBefore);
     expect(localStorage.getItem(TASKS_KEY)).toBe(tasksBefore);
@@ -297,7 +299,7 @@ describe("migration record lifecycle", () => {
       listRow({ name: "" }),
     ]);
 
-    await expect(runMigration()).rejects.toThrow();
+    await expect(runMigration(TEST_USER_ID)).rejects.toThrow();
     expect(record()?.status).not.toBe("done");
   });
 
@@ -321,7 +323,7 @@ describe("migration record lifecycle", () => {
     };
 
     try {
-      await expect(runMigration()).rejects.toThrow("boom");
+      await expect(runMigration(TEST_USER_ID)).rejects.toThrow("boom");
 
       expect(record().status).not.toBe("done");
       expect(record().listIdMap["legacy-a"]).toBeTruthy();
@@ -330,7 +332,7 @@ describe("migration record lifecycle", () => {
 
       // Second run resumes: Alpha is already mapped, so it is not recreated.
       const alphaId = record().listIdMap["legacy-a"];
-      await runMigration();
+      await runMigration(TEST_USER_ID);
 
       expect(record().status).toBe("done");
       expect(record().listIdMap["legacy-a"]).toBe(alphaId);
@@ -345,7 +347,7 @@ describe("migration record lifecycle", () => {
   it("treats a fresh install as nothing to migrate and writes no record", async () => {
     // Nothing exists to migrate, so there is nothing to write and no reason
     // to invent migration history for it.
-    const result = await runMigration();
+    const result = await runMigration(TEST_USER_ID);
 
     expect(result.skipped).toBe(true);
     expect(record()).toBeNull();
@@ -385,7 +387,7 @@ describe("server conflict detection", () => {
       listRow(),
     ]);
 
-    await expect(runMigration()).rejects.toBeInstanceOf(MigrationConflictError);
+    await expect(runMigration(TEST_USER_ID)).rejects.toBeInstanceOf(MigrationConflictError);
     expect(record()).toBeNull();
     // Nothing was written, merged or overwritten.
     expect(db.lists.some((list) => list.name === "Work")).toBe(false);
@@ -416,7 +418,7 @@ describe("server conflict detection", () => {
       tasks: [],
     });
 
-    await runMigration();
+    await runMigration(TEST_USER_ID);
 
     expect(record().status).toBe("done");
     expect(record().listIdMap["legacy-a"]).toBe("server-alpha");
@@ -446,6 +448,6 @@ describe("server conflict detection", () => {
       ],
     });
 
-    await expect(runMigration()).rejects.toBeInstanceOf(MigrationConflictError);
+    await expect(runMigration(TEST_USER_ID)).rejects.toBeInstanceOf(MigrationConflictError);
   });
 });
