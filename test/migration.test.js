@@ -454,7 +454,7 @@ describe("server conflict detection", () => {
       listRow({ id: "legacy-a", name: "Alpha" }),
     ]);
     localStorage.setItem(
-      "todo-app-migration",
+      "todo-app-migration:test-user",
       JSON.stringify({
         version: 1,
         status: "running",
