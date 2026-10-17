@@ -138,3 +138,16 @@ describe("search debounce behavior (0ms in test mode)", () => {
     expect(lastTaskQuery.value.completed).toBe(false);
   });
 });
+
+vi.mock("../src/lib/authSession.js", async () => {
+  const actual = await vi.importActual("../src/lib/authSession.js");
+  return { ...actual, getAccessTokenSubject: () => "test-user" };
+});
+
+vi.mock("../src/context/AuthProvider.jsx", () => ({
+  useAuth: () => ({
+    status: "authenticated",
+    isAuthenticated: true,
+    logout: vi.fn().mockResolvedValue(undefined),
+  }),
+}));
