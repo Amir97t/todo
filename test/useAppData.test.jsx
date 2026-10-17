@@ -179,7 +179,7 @@ describe("store switch", () => {
     const { result } = renderHook(() => useAppData());
     await waitFor(() => expect(result.current.status).toBe("ready"));
 
-    const record = JSON.parse(localStorage.getItem("todo-app-migration"));
+    const record = JSON.parse(localStorage.getItem("todo-app-migration:test-user"));
     expect(record.status).toBe("done");
     expect(result.current.status).toBe("ready");
   });
