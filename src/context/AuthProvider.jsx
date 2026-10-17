@@ -1,8 +1,7 @@
-import { createContext, useCallback, useContext, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import { auth, ApiError } from "../lib/api.js";
 import { clearAccessToken, getAccessToken, subscribeToAuthToken } from "../lib/authSession.js";
-
-const AuthContext = createContext(null);
+import { AuthContext } from "./AuthContext.js";
 
 export function AuthProvider({ children }) {
   const [token, setToken] = useState(() => getAccessToken());
@@ -11,17 +10,19 @@ export function AuthProvider({ children }) {
 
   useEffect(() => subscribeToAuthToken(setToken), []);
 
-  const restoreSession = useCallback(async () => {
-    setStatus("checking");
-    setError(null);
-
+  // The first update happens only after the asynchronous refresh settles.
+  // Initial state is already "checking", so the mount effect needs no
+  // synchronous state updates of its own.
+  const performSessionRestore = useCallback(async () => {
     try {
       await auth.refresh();
+      setError(null);
       setStatus("authenticated");
       return true;
     } catch (cause) {
       clearAccessToken();
       if (cause instanceof ApiError && cause.status === 401) {
+        setError(null);
         setStatus("unauthenticated");
         return false;
       }
@@ -31,9 +32,17 @@ export function AuthProvider({ children }) {
     }
   }, []);
 
+  // Explicit retries enter the checking state immediately; the initial
+  // effect calls performSessionRestore directly because status starts there.
+  const restoreSession = useCallback(() => {
+    setStatus("checking");
+    setError(null);
+    return performSessionRestore();
+  }, [performSessionRestore]);
+
   useEffect(() => {
-    void restoreSession();
-  }, [restoreSession]);
+    void performSessionRestore();
+  }, [performSessionRestore]);
 
   const login = useCallback(async (credentials) => {
     setError(null);
@@ -73,8 +82,3 @@ export function AuthProvider({ children }) {
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;
 }
 
-export function useAuth() {
-  const value = useContext(AuthContext);
-  if (!value) throw new Error("useAuth must be used inside AuthProvider.");
-  return value;
-}
