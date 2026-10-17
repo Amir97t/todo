@@ -2,16 +2,15 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import {
   ApiError,
   auth,
-  clearAccessToken,
   buildUrl,
   checklist,
   lists,
   request,
   resolveBaseUrl,
   tasks,
-  getAccessToken,
   toQueryString,
 } from "./api.js";
+import { clearAccessToken, getAccessToken, setAccessToken } from "./authSession.js";
 
 function jsonResponse(body, { status = 200 } = {}) {
   return {
@@ -232,8 +231,6 @@ describe("authentication requests", () => {
 
   it("attaches the in-memory bearer token to protected API requests", async () => {
     fetchMock.mockResolvedValueOnce(jsonResponse({ id: "list-1" }));
-    await auth.login;
-    const { setAccessToken } = await import("./authSession.js");
     setAccessToken("access-2");
 
     await request("/lists");
@@ -254,7 +251,6 @@ describe("authentication requests", () => {
       .mockResolvedValueOnce(jsonResponse({ accessToken: "access-3" }))
       .mockResolvedValueOnce(jsonResponse([{ id: "list-1" }]));
 
-    const { setAccessToken } = await import("./authSession.js");
     setAccessToken("expired-token");
 
     await expect(request("/lists")).resolves.toEqual([{ id: "list-1" }]);
@@ -265,7 +261,6 @@ describe("authentication requests", () => {
   });
 
   it("clears the in-memory token after logout even if the request fails", async () => {
-    const { setAccessToken } = await import("./authSession.js");
     setAccessToken("access-4");
     fetchMock
       .mockResolvedValueOnce(jsonResponse({ csrfToken: "csrf-3" }))
