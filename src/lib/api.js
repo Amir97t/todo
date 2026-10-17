@@ -223,13 +223,23 @@ export const auth = {
   },
 };
 
-async function refreshAuthSession() {
-  try {
-    return acceptAuthResponse(await postAuth("/auth/refresh"));
-  } catch (error) {
-    clearAccessToken();
-    throw error;
-  }
+let refreshInFlight = null;
+
+function refreshAuthSession() {
+  if (refreshInFlight) return refreshInFlight;
+
+  refreshInFlight = (async () => {
+    try {
+      return acceptAuthResponse(await postAuth("/auth/refresh"));
+    } catch (error) {
+      clearAccessToken();
+      throw error;
+    }
+  })().finally(() => {
+    refreshInFlight = null;
+  });
+
+  return refreshInFlight;
 }
 
 function idPath(...segments) {
