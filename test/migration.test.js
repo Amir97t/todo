@@ -423,7 +423,7 @@ describe("server conflict detection", () => {
 
     // Simulate a prior partial run that created Alpha only.
     localStorage.setItem(
-      "todo-app-migration",
+      "todo-app-migration:test-user",
       JSON.stringify({
         version: 1,
         status: "running",
