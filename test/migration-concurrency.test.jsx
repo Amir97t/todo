@@ -10,6 +10,8 @@ import {
 } from "../src/lib/migration.js";
 import { calls, db, reset } from "./fakeApi.js";
 
+const TEST_USER_ID = "test-user";
+
 vi.mock("../src/lib/api.js", async () => {
   const { fakeApi } = await import("./fakeApi.js");
   return fakeApi;
@@ -57,8 +59,8 @@ describe("migration single-flight", () => {
     reset();
 
     // Deliberately un-awaited: both callers race for the same work.
-    const first = runMigration();
-    const second = runMigration();
+    const first = runMigration(TEST_USER_ID);
+    const second = runMigration(TEST_USER_ID);
 
     const [a, b] = await Promise.all([first, second]);
 
@@ -67,7 +69,7 @@ describe("migration single-flight", () => {
     expect(db.tasks[0].title).toBe("Only task");
     expect(a.record.status).toBe("done");
     expect(b.record.status).toBe("done");
-    expect(readMigrationRecord().migratedTaskIds).toEqual(["legacy-1"]);
+    expect(readMigrationRecord(TEST_USER_ID).migratedTaskIds).toEqual(["legacy-1"]);
   });
 
   it("acquires the cross-tab migration lock", async () => {
@@ -76,7 +78,7 @@ describe("migration single-flight", () => {
 
     const spy = vi.spyOn(navigator.locks, "request");
 
-    await runMigration();
+    await runMigration(TEST_USER_ID);
 
     expect(spy).toHaveBeenCalledWith(MIGRATION_LOCK, expect.any(Function));
     spy.mockRestore();
@@ -93,7 +95,7 @@ describe("migration single-flight", () => {
     });
 
     try {
-      await expect(runMigration()).rejects.toBeInstanceOf(MigrationError);
+      await expect(runMigration(TEST_USER_ID)).rejects.toBeInstanceOf(MigrationError);
     } finally {
       Object.defineProperty(navigator, "locks", {
         configurable: true,
@@ -104,7 +106,7 @@ describe("migration single-flight", () => {
     // Nothing may be written when the lock cannot be taken.
     expect(db.tasks).toHaveLength(0);
     expect(calls).toHaveLength(0);
-    expect(readMigrationRecord()).toBeNull();
+    expect(readMigrationRecord(TEST_USER_ID)).toBeNull();
   });
 
   it("releases the in-flight slot so a later retry can run", async () => {
@@ -113,13 +115,13 @@ describe("migration single-flight", () => {
     // A malformed task aborts the pipeline before anything is created.
     seedInboxOnlyWithOneTask(oneLegacyTask({ createdAt: "not-a-number" }));
 
-    await expect(runMigration()).rejects.toBeInstanceOf(MigrationError);
-    expect(readMigrationRecord()?.status).not.toBe("done");
+    await expect(runMigration(TEST_USER_ID)).rejects.toBeInstanceOf(MigrationError);
+    expect(readMigrationRecord(TEST_USER_ID)?.status).not.toBe("done");
 
     // Repair the fixture; a failed run must not be cached.
     seedInboxOnlyWithOneTask();
 
-    const retried = await runMigration();
+    const retried = await runMigration(TEST_USER_ID);
 
     expect(retried.record.status).toBe("done");
     expect(db.tasks).toHaveLength(1);
@@ -141,11 +143,11 @@ describe("StrictMode mount (the original bug)", () => {
     );
 
     await waitFor(() => expect(taskCreates()).toHaveLength(1));
-    await waitFor(() => expect(readMigrationRecord()?.status).toBe("done"));
+    await waitFor(() => expect(readMigrationRecord(TEST_USER_ID)?.status).toBe("done"));
 
     expect(db.tasks).toHaveLength(1);
     expect(db.tasks[0].title).toBe("Only task");
-    expect(readMigrationRecord().migratedTaskIds).toEqual(["legacy-1"]);
+    expect(readMigrationRecord(TEST_USER_ID).migratedTaskIds).toEqual(["legacy-1"]);
     expect(screen.queryByText("Could not load your data")).toBeNull();
   });
 });
