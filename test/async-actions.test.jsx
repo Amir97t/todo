@@ -29,7 +29,7 @@ function renderApp() {
 const legacyLists = () => JSON.parse(localStorage.getItem("todo-app-lists"));
 const legacyTasks = () => JSON.parse(localStorage.getItem("todo-app-tasks"));
 const migrationRecord = () =>
-  JSON.parse(localStorage.getItem("todo-app-migration"));
+  JSON.parse(localStorage.getItem("todo-app-migration:test-user"));
 
 const flush = () => act(async () => {});
 
