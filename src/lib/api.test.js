@@ -1,12 +1,15 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import {
   ApiError,
+  auth,
+  clearAccessToken,
   buildUrl,
   checklist,
   lists,
   request,
   resolveBaseUrl,
   tasks,
+  getAccessToken,
   toQueryString,
 } from "./api.js";
 
@@ -179,6 +182,97 @@ describe("error envelope", () => {
     fetchMock.mockResolvedValue(jsonResponse([{ id: "1" }]));
 
     await expect(request("/lists")).resolves.toEqual([{ id: "1" }]);
+  });
+});
+
+
+describe("authentication requests", () => {
+  let fetchMock;
+
+  beforeEach(() => {
+    fetchMock = vi.fn();
+    vi.stubGlobal("fetch", fetchMock);
+    vi.stubEnv("VITE_API_URL", "https://api.example.com");
+    clearAccessToken();
+  });
+
+  afterEach(() => {
+    clearAccessToken();
+    vi.unstubAllGlobals();
+    vi.unstubAllEnvs();
+  });
+
+  it("fetches a CSRF token and sends it with login using cookie credentials", async () => {
+    fetchMock
+      .mockResolvedValueOnce(jsonResponse({ csrfToken: "csrf-1" }))
+      .mockResolvedValueOnce(jsonResponse({ accessToken: "access-1" }));
+
+    await auth.login({ email: "person@example.com", password: "password123" });
+
+    expect(fetchMock).toHaveBeenNthCalledWith(
+      1,
+      "https://api.example.com/api/v1/auth/csrf",
+      expect.objectContaining({ credentials: "include" }),
+    );
+    expect(fetchMock).toHaveBeenNthCalledWith(
+      2,
+      "https://api.example.com/api/v1/auth/login",
+      expect.objectContaining({
+        method: "POST",
+        credentials: "include",
+        headers: expect.objectContaining({
+          "X-CSRF-Token": "csrf-1",
+          "Content-Type": "application/json",
+        }),
+        body: JSON.stringify({ email: "person@example.com", password: "password123" }),
+      }),
+    );
+    expect(getAccessToken()).toBe("access-1");
+  });
+
+  it("attaches the in-memory bearer token to protected API requests", async () => {
+    fetchMock.mockResolvedValueOnce(jsonResponse({ id: "list-1" }));
+    await auth.login;
+    const { setAccessToken } = await import("./authSession.js");
+    setAccessToken("access-2");
+
+    await request("/lists");
+
+    expect(fetchMock).toHaveBeenCalledWith(
+      "https://api.example.com/api/v1/lists",
+      expect.objectContaining({
+        credentials: "omit",
+        headers: expect.objectContaining({ Authorization: "Bearer access-2" }),
+      }),
+    );
+  });
+
+  it("refreshes once after a protected request returns 401", async () => {
+    fetchMock
+      .mockResolvedValueOnce({ ok: false, status: 401, text: async () => JSON.stringify({ message: "Unauthorized" }) })
+      .mockResolvedValueOnce(jsonResponse({ csrfToken: "csrf-2" }))
+      .mockResolvedValueOnce(jsonResponse({ accessToken: "access-3" }))
+      .mockResolvedValueOnce(jsonResponse([{ id: "list-1" }]));
+
+    const { setAccessToken } = await import("./authSession.js");
+    setAccessToken("expired-token");
+
+    await expect(request("/lists")).resolves.toEqual([{ id: "list-1" }]);
+
+    expect(fetchMock).toHaveBeenCalledTimes(4);
+    expect(fetchMock.mock.calls[2][0]).toBe("https://api.example.com/api/v1/auth/refresh");
+    expect(fetchMock.mock.calls[3][1].headers.Authorization).toBe("Bearer access-3");
+  });
+
+  it("clears the in-memory token after logout even if the request fails", async () => {
+    const { setAccessToken } = await import("./authSession.js");
+    setAccessToken("access-4");
+    fetchMock
+      .mockResolvedValueOnce(jsonResponse({ csrfToken: "csrf-3" }))
+      .mockRejectedValueOnce(new TypeError("network down"));
+
+    await expect(auth.logout()).rejects.toMatchObject({ code: "NETWORK_ERROR" });
+    expect(getAccessToken()).toBeNull();
   });
 });
 
