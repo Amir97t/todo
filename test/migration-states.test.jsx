@@ -183,7 +183,7 @@ describe("State C — migration already done", () => {
   it("hydrates from the API without migrating again", async () => {
     reset({ lists: [INBOX_ROW, FOREIGN_LIST], tasks: [FOREIGN_TASK] });
     localStorage.setItem(
-      "todo-app-migration",
+      "todo-app-migration:test-user",
       JSON.stringify({
         version: 1,
         status: "done",
