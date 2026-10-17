@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { useAuth } from "../../context/AuthProvider.jsx";
+import { useAuth } from "../../context/AuthContext.js";
 
 export default function AuthScreen() {
   const { login, register, error, clearError, restoreSession } = useAuth();
