@@ -133,7 +133,7 @@ async function waitForBackend(child, captured) {
       const diagnostics = [
         captured.stdout.trim() && `stdout: ${redactUrl(captured.stdout.trim())}`,
         captured.stderr.trim() && `stderr: ${redactUrl(captured.stderr.trim())}`,
-      ].filter(Boolean).join("\\n");
+      ].filter(Boolean).join("\n");
       throw new Error(
         `Test backend exited with code ${child.exitCode}: ${diagnostics || "<no process output>"}`,
       );
@@ -216,11 +216,10 @@ export default async function globalSetup() {
   }
   await assertPortAvailable();
 
-  if (!existsSync(path.join(BACKEND_DIR, "dist", "main.js"))) {
-    const built = runInBackend("npm", ["run", "build"]);
-    if (built.status !== 0) {
-      throw new Error(`Backend build failed:\n${redactUrl(built.stdout)}\n${redactUrl(built.stderr)}`);
-    }
+  // Always compile the current backend checkout; an existing dist/ may be stale.
+  const built = runInBackend("npm", ["run", "build"]);
+  if (built.status !== 0) {
+    throw new Error(`Backend build failed:\n${redactUrl(built.stdout)}\n${redactUrl(built.stderr)}`);
   }
 
   const applied = runInBackend(
