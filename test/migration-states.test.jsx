@@ -9,6 +9,8 @@ import {
 } from "../src/lib/migration.js";
 import { db, reset } from "./fakeApi.js";
 
+const TEST_USER_ID = "test-user";
+
 vi.mock("../src/lib/api.js", async () => {
   const { fakeApi } = await import("./fakeApi.js");
   return fakeApi;
@@ -74,7 +76,7 @@ describe("State A — fresh browser, nothing to migrate", () => {
       "Someone else's",
     );
     // Nothing was migrated, so no record should be invented.
-    expect(readMigrationRecord()).toBeNull();
+    expect(readMigrationRecord(TEST_USER_ID)).toBeNull();
 
     // Pages publish the query; a bare hook has not, so ask for one and the
     // server should answer with its own rows.
@@ -95,7 +97,7 @@ describe("State A — fresh browser, nothing to migrate", () => {
     expect(result.current.lists.map((list) => list.id)).toEqual([
       INBOX_LIST_ID,
     ]);
-    expect(readMigrationRecord()).toBeNull();
+    expect(readMigrationRecord(TEST_USER_ID)).toBeNull();
   });
 
   it("ignores a legacy Inbox sentinel with nothing else to migrate", async () => {
@@ -109,7 +111,7 @@ describe("State A — fresh browser, nothing to migrate", () => {
     expect(result.current.lists.map((list) => list.name)).toContain(
       "Someone else's",
     );
-    expect(readMigrationRecord()).toBeNull();
+    expect(readMigrationRecord(TEST_USER_ID)).toBeNull();
   });
 });
 
@@ -121,8 +123,8 @@ describe("State B — legacy data still needs migrating", () => {
       { id: "legacy-a", name: "Alpha", icon: "briefcase" },
     ]);
 
-    await expect(runMigration()).rejects.toBeInstanceOf(MigrationConflictError);
-    expect(readMigrationRecord()).toBeNull();
+    await expect(runMigration(TEST_USER_ID)).rejects.toBeInstanceOf(MigrationConflictError);
+    expect(readMigrationRecord(TEST_USER_ID)).toBeNull();
     // Refusal must not have written, merged or renamed anything.
     expect(db.lists.map((list) => list.name)).toEqual(["Inbox", "Someone else's"]);
   });
@@ -138,7 +140,7 @@ describe("State B — legacy data still needs migrating", () => {
 
     await waitFor(() => expect(result.current.status).toBe("error"));
     expect(result.current.error).toContain("already contains");
-    expect(readMigrationRecord()).toBeNull();
+    expect(readMigrationRecord(TEST_USER_ID)).toBeNull();
   });
 });
 
@@ -166,7 +168,7 @@ describe("State D — resumable migration", () => {
       }),
     );
 
-    const result = await runMigration();
+    const result = await runMigration(TEST_USER_ID);
 
     expect(result.record.status).toBe("done");
     expect(result.record.listIdMap["legacy-a"]).toBe(
@@ -201,6 +203,6 @@ describe("State C — migration already done", () => {
       "Someone else's",
     );
     expect(result.current.lists.map((list) => list.name)).not.toContain("Alpha");
-    expect(readMigrationRecord().status).toBe("done");
+    expect(readMigrationRecord(TEST_USER_ID).status).toBe("done");
   });
 });
