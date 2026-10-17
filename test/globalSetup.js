@@ -1,7 +1,9 @@
 import { spawn, spawnSync } from "node:child_process";
 import { existsSync, readFileSync } from "node:fs";
+import net from "node:net";
 import path from "node:path";
 import process from "node:process";
+import { randomBytes } from "node:crypto";
 import { setTimeout as delay } from "node:timers/promises";
 import {
   BACKEND_DIR,
@@ -13,6 +15,11 @@ import {
 import { INBOX_LIST_ID } from "../src/lib/constants.js";
 
 const API_BASE = `${LIVE_BASE_URL}/api/v1`;
+
+// Pin this test harness to the dedicated Neon branch. Update intentionally if
+// that branch/endpoint is ever replaced; never infer a target from todo_dev.
+const EXPECTED_TEST_DB_HOST =
+  "ep-wild-lab-b25v1scx.c-6.eu-central-1.aws.neon.tech";
 
 function readBackendEnv() {
   const file = path.join(BACKEND_DIR, ".env");
@@ -28,31 +35,49 @@ function readBackendEnv() {
 }
 
 /**
- * Derives the test database from the developer's own DATABASE_URL so no
- * credential is ever committed. TEST_DATABASE_URL wins when set.
+ * Requires an explicit URL for the dedicated test database. It intentionally
+ * does not derive a database name from DATABASE_URL, which may be todo_dev or
+ * a production connection.
  */
 function resolveTestDatabaseUrl() {
-  if (process.env.TEST_DATABASE_URL) return process.env.TEST_DATABASE_URL;
+  const fileEnv = readBackendEnv();
+  const rawUrl = process.env.TEST_DATABASE_URL || fileEnv.TEST_DATABASE_URL;
 
-  const dev = readBackendEnv().DATABASE_URL;
-  if (!dev) {
+  if (!rawUrl) {
     throw new Error(
-      "Cannot derive the test database URL: set TEST_DATABASE_URL, or add DATABASE_URL to todo-api/.env.",
+      "TEST_DATABASE_URL is required in the process environment or todo-api/.env. Refusing to infer a test database.",
     );
   }
 
-  const derived = dev.replace(
-    /^([^:]+:\/\/[^/]+\/)([^/?]+)(.*)$/,
-    (_match, head, _database, tail) => `${head}${TEST_DB_NAME}${tail}`,
-  );
-
-  if (derived === dev) {
-    throw new Error(
-      `DATABASE_URL has no database name to replace: ${redactUrl(dev)}`,
-    );
+  let parsed;
+  try {
+    parsed = new URL(rawUrl);
+  } catch {
+    throw new Error("TEST_DATABASE_URL is not a valid URL. Check todo-api/.env.");
   }
 
-  return derived;
+  const databaseName = decodeURIComponent(parsed.pathname.replace(/^\//, ""));
+  if (!["postgres:", "postgresql:"].includes(parsed.protocol)) {
+    throw new Error("TEST_DATABASE_URL must use the PostgreSQL protocol.");
+  }
+  if (parsed.hostname !== EXPECTED_TEST_DB_HOST) {
+    throw new Error(
+      `Refusing test setup: TEST_DATABASE_URL host is not the dedicated test endpoint (received ${parsed.hostname || "<empty>"}).`,
+    );
+  }
+  if (databaseName !== TEST_DB_NAME) {
+    throw new Error(
+      `Refusing test setup: expected database ${TEST_DB_NAME}, received ${databaseName || "<empty>"}.`,
+    );
+  }
+  if (!parsed.username || !parsed.password) {
+    throw new Error("TEST_DATABASE_URL must include database credentials.");
+  }
+  if (parsed.searchParams.get("sslmode") !== "require") {
+    throw new Error("TEST_DATABASE_URL must include sslmode=require.");
+  }
+
+  return rawUrl;
 }
 
 function runInBackend(command, args, options = {}) {
@@ -73,6 +98,27 @@ async function isHealthy() {
   } catch {
     return false;
   }
+}
+
+/** Check the port itself, not just whether a healthy API answers on it. */
+async function assertPortAvailable() {
+  await new Promise((resolve, reject) => {
+    const server = net.createServer();
+    server.once("error", (error) => {
+      if (error.code === "EADDRINUSE") {
+        reject(
+          new Error(
+            `Port ${LIVE_PORT} is already occupied. Refusing to migrate or reset any database; stop the process using this port and retry.`,
+          ),
+        );
+      } else {
+        reject(error);
+      }
+    });
+    server.listen(LIVE_PORT, "127.0.0.1", () => {
+      server.close((error) => (error ? reject(error) : resolve()));
+    });
+  });
 }
 
 async function waitForBackend(child, captured) {
@@ -100,23 +146,46 @@ async function waitForBackend(child, captured) {
 }
 
 async function resetToInboxOnly() {
-  const lists = await (await fetch(`${API_BASE}/lists`)).json();
+  const listsResponse = await fetch(`${API_BASE}/lists`);
+  if (!listsResponse.ok) {
+    throw new Error(`Cannot list test lists (HTTP ${listsResponse.status}); refusing cleanup.`);
+  }
+  const lists = await listsResponse.json();
   for (const list of lists) {
     if (list.id === INBOX_LIST_ID) continue;
-    await fetch(`${API_BASE}/lists/${list.id}?strategy=delete`, {
-      method: "DELETE",
-    });
+    const response = await fetch(
+      `${API_BASE}/lists/${list.id}?strategy=delete`,
+      { method: "DELETE" },
+    );
+    if (!response.ok) {
+      throw new Error(`Failed to delete test list ${list.id} (HTTP ${response.status}).`);
+    }
   }
 
-  const tasks = await (await fetch(`${API_BASE}/tasks`)).json();
+  const tasksResponse = await fetch(`${API_BASE}/tasks`);
+  if (!tasksResponse.ok) {
+    throw new Error(`Cannot list test tasks (HTTP ${tasksResponse.status}); refusing cleanup.`);
+  }
+  const tasks = await tasksResponse.json();
   for (const task of tasks) {
-    await fetch(`${API_BASE}/tasks/${task.id}`, { method: "DELETE" });
+    const response = await fetch(`${API_BASE}/tasks/${task.id}`, {
+      method: "DELETE",
+    });
+    if (!response.ok) {
+      throw new Error(`Failed to delete test task ${task.id} (HTTP ${response.status}).`);
+    }
   }
 }
 
 async function assertIsolated() {
-  const lists = await (await fetch(`${API_BASE}/lists`)).json();
-  const tasks = await (await fetch(`${API_BASE}/tasks`)).json();
+  const listsResponse = await fetch(`${API_BASE}/lists`);
+  const tasksResponse = await fetch(`${API_BASE}/tasks`);
+  if (!listsResponse.ok || !tasksResponse.ok) {
+    throw new Error("Cannot verify test database isolation because the API returned an error.");
+  }
+
+  const lists = await listsResponse.json();
+  const tasks = await tasksResponse.json();
   const foreign = lists.filter((list) => list.id !== INBOX_LIST_ID);
 
   if (foreign.length > 0 || tasks.length > 0) {
@@ -128,14 +197,19 @@ async function assertIsolated() {
 }
 
 /**
- * Brings up a backend bound to todo_test before any test module is imported,
- * so live-migration.test.js sees a database that is Inbox-only.
- *
- * todo_dev is never touched: the child process is spawned with the derived
- * test URL, and data is only reset on a server we spawned ourselves.
+ * Starts a backend against the explicitly pinned todo_test database. All
+ * target and port checks happen before migrations or data cleanup.
  */
 export default async function globalSetup() {
   const databaseUrl = resolveTestDatabaseUrl();
+
+  if (await isHealthy()) {
+    throw new Error(
+      `Port ${LIVE_PORT} at ${LIVE_BASE_URL} is already serving a healthy API. ` +
+        "Refusing to migrate or reset data on a server this setup did not start.",
+    );
+  }
+  await assertPortAvailable();
 
   if (!existsSync(path.join(BACKEND_DIR, "dist", "main.js"))) {
     const built = runInBackend("npm", ["run", "build"]);
@@ -145,7 +219,12 @@ export default async function globalSetup() {
   }
 
   const applied = runInBackend("npx", ["prisma", "migrate", "deploy"], {
-    env: { ...process.env, DATABASE_URL: databaseUrl, DIRECT_URL: databaseUrl },
+    env: {
+      ...process.env,
+      TEST_DATABASE_URL: databaseUrl,
+      DATABASE_URL: databaseUrl,
+      DIRECT_URL: databaseUrl,
+    },
   });
   if (applied.status !== 0) {
     throw new Error(
@@ -155,17 +234,20 @@ export default async function globalSetup() {
 
   let child = null;
   const captured = { stderr: "" };
-
-  if (await isHealthy()) {
-    throw new Error(
-      `Port ${LIVE_PORT} at ${LIVE_BASE_URL} is already in use by a server this setup did not start. ` +
-        "Refusing to reset data on a server whose database cannot be verified — free the port and retry.",
-    );
-  }
+  // Use a process-local test-only secret; never borrow a production JWT secret.
+  const testJwtSecret =
+    process.env.TEST_JWT_SECRET || randomBytes(32).toString("hex");
 
   child = spawn(process.execPath, ["dist/main.js"], {
     cwd: BACKEND_DIR,
-    env: { ...process.env, PORT: String(LIVE_PORT), DATABASE_URL: databaseUrl },
+    env: {
+      ...process.env,
+      PORT: String(LIVE_PORT),
+      TEST_DATABASE_URL: databaseUrl,
+      DATABASE_URL: databaseUrl,
+      DIRECT_URL: databaseUrl,
+      JWT_SECRET: testJwtSecret,
+    },
     stdio: ["ignore", "ignore", "pipe"],
   });
   child.stderr.on("data", (chunk) => {
