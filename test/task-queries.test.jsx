@@ -361,3 +361,17 @@ describe("stale response protection", () => {
     }
   });
 });
+
+
+vi.mock("../src/lib/authSession.js", async () => {
+  const actual = await vi.importActual("../src/lib/authSession.js");
+  return { ...actual, getAccessTokenSubject: () => "test-user" };
+});
+
+vi.mock("../src/context/AuthProvider.jsx", () => ({
+  useAuth: () => ({
+    status: "authenticated",
+    isAuthenticated: true,
+    logout: vi.fn().mockResolvedValue(undefined),
+  }),
+}));
