@@ -10,39 +10,49 @@ export function AuthProvider({ children }) {
 
   useEffect(() => subscribeToAuthToken(setToken), []);
 
-  // The first update happens only after the asynchronous refresh settles.
-  // Initial state is already "checking", so the mount effect needs no
-  // synchronous state updates of its own.
+  // The async operation returns a result without updating React state.
+  // This keeps its effect caller free of synchronous state transitions.
   const performSessionRestore = useCallback(async () => {
     try {
       await auth.refresh();
-      setError(null);
-      setStatus("authenticated");
-      return true;
+      return { status: "authenticated", error: null };
     } catch (cause) {
       clearAccessToken();
       if (cause instanceof ApiError && cause.status === 401) {
-        setError(null);
-        setStatus("unauthenticated");
-        return false;
+        return { status: "unauthenticated", error: null };
       }
-      setError(cause?.message || "Unable to connect to the server.");
-      setStatus("error");
-      return false;
+      return {
+        status: "error",
+        error: cause?.message || "Unable to connect to the server.",
+      };
     }
   }, []);
 
-  // Explicit retries enter the checking state immediately; the initial
-  // effect calls performSessionRestore directly because status starts there.
-  const restoreSession = useCallback(() => {
+  const applySessionRestoreResult = useCallback((result) => {
+    setError(result.error);
+    setStatus(result.status);
+  }, []);
+
+  // Explicit retries enter the checking state immediately.
+  const restoreSession = useCallback(async () => {
     setStatus("checking");
     setError(null);
-    return performSessionRestore();
-  }, [performSessionRestore]);
+    const result = await performSessionRestore();
+    applySessionRestoreResult(result);
+    return result.status === "authenticated";
+  }, [performSessionRestore, applySessionRestoreResult]);
 
   useEffect(() => {
-    void performSessionRestore();
-  }, [performSessionRestore]);
+    let active = true;
+
+    performSessionRestore().then((result) => {
+      if (active) applySessionRestoreResult(result);
+    });
+
+    return () => {
+      active = false;
+    };
+  }, [performSessionRestore, applySessionRestoreResult]);
 
   const login = useCallback(async (credentials) => {
     setError(null);
