@@ -147,5 +147,5 @@ describe("live migration against the running backend", () => {
 
     expect(second.skipped).toBe(true);
     expect(await listsApi.get()).toHaveLength(listsBeforeSecondRun.length);
-  });
+  }, 30_000);
 });
