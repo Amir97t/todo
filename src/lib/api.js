@@ -82,7 +82,6 @@ async function performRequest(
     signal,
     credentials = "omit",
     csrfToken,
-    retryAuth = true,
   } = {},
 ) {
   const url = buildUrl(path, query);
@@ -174,7 +173,6 @@ export async function request(path, options = {}) {
 async function getCsrfToken() {
   const payload = await performRequest("/auth/csrf", {
     credentials: "include",
-    retryAuth: false,
   });
 
   if (typeof payload?.csrfToken !== "string" || payload.csrfToken.length === 0) {
@@ -191,7 +189,6 @@ async function postAuth(path, body) {
     body,
     credentials: "include",
     csrfToken,
-    retryAuth: false,
   });
 }
 
