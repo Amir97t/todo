@@ -40,3 +40,23 @@ function notify() {
     listener(accessToken);
   }
 }
+
+/**
+ * Reads the subject only to namespace browser-local migration metadata.
+ * Authorization decisions are always made by the API, never by this value.
+ */
+export function getAccessTokenSubject() {
+  if (!accessToken) return null;
+
+  try {
+    const parts = accessToken.split(".");
+    if (parts.length !== 3) return null;
+    const encoded = parts[1].replace(/-/g, "+").replace(/_/g, "/");
+    const payload = JSON.parse(atob(encoded.padEnd(Math.ceil(encoded.length / 4) * 4, "=")));
+    return typeof payload.sub === "string" && payload.sub.length > 0
+      ? payload.sub
+      : null;
+  } catch {
+    return null;
+  }
+}
