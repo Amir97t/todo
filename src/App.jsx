@@ -4,7 +4,7 @@ import useAppData from "./hooks/useAppData";
 import CelestialBackground from "./components/common/CelestialBackground";
 import MutationErrorBanner from "./components/common/MutationErrorBanner";
 import AuthScreen from "./components/auth/AuthScreen.jsx";
-import { useAuth } from "./context/AuthProvider.jsx";
+import { useAuth } from "./context/AuthContext.js";
 
 function LoadingScreen() {
   return (
