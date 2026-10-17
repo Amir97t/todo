@@ -49,8 +49,14 @@ export function AuthProvider({ children }) {
 
   const logout = useCallback(async () => {
     setError(null);
-    await auth.logout();
-    setStatus("unauthenticated");
+    try {
+      await auth.logout();
+      setStatus("unauthenticated");
+    } catch (cause) {
+      setError(cause?.message || "Sign out could not be completed.");
+      setStatus("error");
+      throw cause;
+    }
   }, []);
 
   const value = useMemo(() => ({
