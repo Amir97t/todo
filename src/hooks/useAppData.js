@@ -6,6 +6,7 @@ import {
 } from "../lib/api.js";
 import { INBOX_LIST_ID } from "../lib/constants.js";
 import { readMigrationRecord, runMigration } from "../lib/migration.js";
+import { getAccessTokenSubject } from "../lib/authSession.js";
 import { mutationKeys } from "../lib/mutationKeys.js";
 import { userMessageFor } from "../lib/errorMessages.js";
 import useLocalStorage from "./useLocalStorage.js";
@@ -151,6 +152,7 @@ export default function useAppData() {
     return storedSelected;
   }, [storedSelected, lists]);
 
+  const userId = getAccessTokenSubject();
   const ready = status === "ready";
 
   useEffect(() => {
@@ -162,13 +164,13 @@ export default function useAppData() {
       setError(null);
 
       try {
-        await runMigration();
+        await runMigration(userId);
 
         const serverLists = await listsApi.get();
 
         if (cancelled) return;
 
-        const record = readMigrationRecord();
+        const record = readMigrationRecord(userId);
         const listIdMap = record?.listIdMap ?? {};
 
         setStoredSelected((previous) => {
@@ -194,7 +196,7 @@ export default function useAppData() {
     };
     // setStoredSelected is stable: useLocalStorage returns a setState.
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [retryToken]);
+  }, [retryToken, userId]);
 
   // Stable identity so a page's query effect only re-runs when its own
   // inputs change — otherwise publishing an equal query would loop forever.
