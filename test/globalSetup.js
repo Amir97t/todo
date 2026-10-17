@@ -250,6 +250,11 @@ export default async function globalSetup() {
       DATABASE_URL: databaseUrl,
       DIRECT_URL: databaseUrl,
       JWT_SECRET: testJwtSecret,
+      // Test the frontend against a disposable local-mode API. Valid Bearer
+      // tokens are still validated, but anonymous legacy-data setup/cleanup
+      // works even if the developer's .env defaults to REQUIRE_AUTH=enforce.
+      REQUIRE_AUTH: "off",
+      RATE_LIMIT: "off",
     },
     stdio: ["ignore", "ignore", "pipe"],
   });
