@@ -2,6 +2,8 @@ const API_PREFIX = "/api/v1";
 const DEFAULT_BASE_URL = "http://localhost:3000";
 const DEFAULT_TIMEOUT_MS = 15000;
 
+import { clearAccessToken, getAccessToken, setAccessToken } from "./authSession.js";
+
 /**
  * Every backend failure — validation, domain or transport — is surfaced to
  * callers as this shape, so no component ever sees a raw Response.
@@ -70,9 +72,18 @@ function fallbackMessage(status) {
     : "The request could not be completed.";
 }
 
-export async function request(
+async function performRequest(
   path,
-  { method = "GET", body, query, timeoutMs = DEFAULT_TIMEOUT_MS, signal } = {},
+  {
+    method = "GET",
+    body,
+    query,
+    timeoutMs = DEFAULT_TIMEOUT_MS,
+    signal,
+    credentials = "omit",
+    csrfToken,
+    retryAuth = true,
+  } = {},
 ) {
   const url = buildUrl(path, query);
   const controller = new AbortController();
@@ -92,13 +103,21 @@ export async function request(
   let response;
 
   try {
+    const headers = body === undefined
+      ? { Accept: "application/json" }
+      : { Accept: "application/json", "Content-Type": "application/json" };
+    const token = getAccessToken();
+
+    if (token && !path.startsWith("/auth/")) {
+      headers.Authorization = `Bearer ${token}`;
+    }
+    if (csrfToken) headers["X-CSRF-Token"] = csrfToken;
+
     response = await fetch(url, {
       method,
-      headers:
-        body === undefined
-          ? { Accept: "application/json" }
-          : { Accept: "application/json", "Content-Type": "application/json" },
+      headers,
       body: body === undefined ? undefined : JSON.stringify(body),
+      credentials,
       signal: controller.signal,
     });
   } catch {
@@ -126,6 +145,91 @@ export async function request(
   }
 
   return payload;
+}
+
+export async function request(path, options = {}) {
+  try {
+    return await performRequest(path, options);
+  } catch (error) {
+    const mayRefresh =
+      options.retryAuth !== false &&
+      error instanceof ApiError &&
+      error.status === 401 &&
+      getAccessToken() !== null &&
+      !path.startsWith("/auth/");
+
+    if (!mayRefresh) throw error;
+
+    try {
+      await refreshAuthSession();
+    } catch {
+      clearAccessToken();
+      throw error;
+    }
+
+    return performRequest(path, { ...options, retryAuth: false });
+  }
+}
+
+async function getCsrfToken() {
+  const payload = await performRequest("/auth/csrf", {
+    credentials: "include",
+    retryAuth: false,
+  });
+
+  if (typeof payload?.csrfToken !== "string" || payload.csrfToken.length === 0) {
+    throw new ApiError(502, "CSRF_TOKEN_MISSING", "Unable to establish a secure session.");
+  }
+
+  return payload.csrfToken;
+}
+
+async function postAuth(path, body) {
+  const csrfToken = await getCsrfToken();
+  return performRequest(path, {
+    method: "POST",
+    body,
+    credentials: "include",
+    csrfToken,
+    retryAuth: false,
+  });
+}
+
+function acceptAuthResponse(payload) {
+  if (typeof payload?.accessToken !== "string" || payload.accessToken.length === 0) {
+    clearAccessToken();
+    throw new ApiError(502, "ACCESS_TOKEN_MISSING", "The server returned an invalid authentication response.");
+  }
+
+  setAccessToken(payload.accessToken);
+  return payload;
+}
+
+export const auth = {
+  register: async ({ email, password }) =>
+    acceptAuthResponse(await postAuth("/auth/register", { email, password })),
+
+  login: async ({ email, password }) =>
+    acceptAuthResponse(await postAuth("/auth/login", { email, password })),
+
+  refresh: refreshAuthSession,
+
+  logout: async () => {
+    try {
+      await postAuth("/auth/logout");
+    } finally {
+      clearAccessToken();
+    }
+  },
+};
+
+async function refreshAuthSession() {
+  try {
+    return acceptAuthResponse(await postAuth("/auth/refresh"));
+  } catch (error) {
+    clearAccessToken();
+    throw error;
+  }
 }
 
 function idPath(...segments) {
