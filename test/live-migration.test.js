@@ -13,17 +13,6 @@ vi.stubEnv("VITE_API_URL", LIVE_BASE_URL);
 
 const BASE_URL = LIVE_BASE_URL;
 
-// Belt and braces: globalSetup guarantees this, so the suite never skips.
-const backend = await (async () => {
-  try {
-    const response = await fetch(`${BASE_URL}/api/v1/health`, {
-      signal: AbortSignal.timeout(2000),
-    });
-    return response.ok;
-  } catch {
-    return false;
-  }
-})();
 
 const marker = `live-migration-${Date.now().toString(36)}`;
 const legacyListId = `legacy-${marker}`;
@@ -56,11 +45,29 @@ function seedLegacy() {
   localStorage.setItem("todo-app-selected-list", JSON.stringify("inbox"));
 }
 
-describe.runIf(backend)("live migration against the running backend", () => {
+describe("live migration against the running backend", () => {
   const createdListIds = [];
   const createdTaskIds = [];
 
   beforeAll(async () => {
+    // Check at suite setup time rather than module evaluation time. A
+    // top-level probe could run before Vitest has completed globalSetup and
+    // silently skip the only live integration test.
+    const healthResponse = await fetch(`${BASE_URL}/api/v1/health`, {
+      signal: AbortSignal.timeout(10_000),
+    });
+    if (!healthResponse.ok) {
+      throw new Error(
+        `Live migration test backend returned HTTP ${healthResponse.status} at ${BASE_URL}.`,
+      );
+    }
+    const health = await healthResponse.json();
+    if (health.database?.status !== "up") {
+      throw new Error(
+        `Live migration test backend is not database-ready at ${BASE_URL}.`,
+      );
+    }
+
     // Never migrate over data this migration did not create.
     const existing = await listsApi.get();
     const foreign = existing.filter((list) => list.id !== INBOX_LIST_ID);
