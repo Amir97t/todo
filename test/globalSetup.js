@@ -131,7 +131,7 @@ async function waitForBackend(child, captured) {
     // answering now is a server whose database we cannot verify.
     if (child && child.exitCode !== null) {
       throw new Error(
-        `Test backend exited with code ${child.exitCode}: ${captured.stderr.trim()}`,
+        `Test backend exited with code ${child.exitCode}: ${redactUrl(captured.stderr.trim())}`,
       );
     }
     if (await isHealthy()) return;
@@ -141,7 +141,7 @@ async function waitForBackend(child, captured) {
   throw new Error(
     `Test backend never became healthy at ${LIVE_BASE_URL} after 60s ` +
       `(exitCode=${child ? child.exitCode : "n/a"}, ` +
-      `stderr=${(captured.stderr || "<empty>").trim()})`,
+      `stderr=${redactUrl((captured.stderr || "<empty>").trim())})`,
   );
 }
 
@@ -214,7 +214,7 @@ export default async function globalSetup() {
   if (!existsSync(path.join(BACKEND_DIR, "dist", "main.js"))) {
     const built = runInBackend("npm", ["run", "build"]);
     if (built.status !== 0) {
-      throw new Error(`Backend build failed:\n${built.stdout}\n${built.stderr}`);
+      throw new Error(`Backend build failed:\n${redactUrl(built.stdout)}\n${redactUrl(built.stderr)}`);
     }
   }
 
@@ -228,7 +228,7 @@ export default async function globalSetup() {
   });
   if (applied.status !== 0) {
     throw new Error(
-      `prisma migrate deploy against ${TEST_DB_NAME} failed:\n${applied.stdout}\n${applied.stderr}`,
+      `prisma migrate deploy against ${TEST_DB_NAME} failed:\n${redactUrl(applied.stdout)}\n${redactUrl(applied.stderr)}`,
     );
   }
 
