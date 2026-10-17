@@ -43,9 +43,10 @@ describe("in-memory access-token state", () => {
 
   it("does not notify when clearing an already-empty session", () => {
     const listener = vi.fn();
-    subscribeToAuthToken(listener);
+    const unsubscribe = subscribeToAuthToken(listener);
 
     clearAccessToken();
+    unsubscribe();
 
     expect(listener).not.toHaveBeenCalled();
   });
