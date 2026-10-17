@@ -88,12 +88,16 @@ function readJson(key, { required = false } = {}) {
   }
 }
 
-export function readMigrationRecord() {
-  return readJson(MIGRATION_KEY);
+function accountMigrationKey(userId) {
+  return MIGRATION_KEY + ":" + userId;
 }
 
-function writeRecord(record) {
-  localStorage.setItem(MIGRATION_KEY, JSON.stringify(record));
+export function readMigrationRecord(userId) {
+  return readJson(userId ? accountMigrationKey(userId) : MIGRATION_KEY);
+}
+
+function writeRecord(userId, record) {
+  localStorage.setItem(accountMigrationKey(userId), JSON.stringify(record));
 }
 
 function fail(message) {
