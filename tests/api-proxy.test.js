@@ -1,7 +1,52 @@
+import { Buffer } from "node:buffer";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import handler from "../api/proxy.js";
 
 const UPSTREAM = "https://tasknote-api-git-feat-auth-cors-d68308-amirs-projects-16941eb8.vercel.app";
+
+class TestHeaders {
+  constructor(initial = {}) {
+    this.values = new Map();
+    const entries = initial instanceof TestHeaders
+      ? [...initial.values.entries()]
+      : Object.entries(initial);
+    for (const [key, value] of entries) this.set(key, value);
+  }
+
+  set(name, value) {
+    this.values.set(String(name).toLowerCase(), String(value));
+  }
+
+  get(name) {
+    return this.values.get(String(name).toLowerCase()) ?? null;
+  }
+
+  getSetCookie() {
+    const value = this.get("set-cookie");
+    return value ? [value] : [];
+  }
+}
+
+class TestResponse {
+  constructor(body = "", options = {}) {
+    this.status = options.status ?? 200;
+    this.headers = new TestHeaders(options.headers ?? {});
+    this.bytes = Buffer.isBuffer(body) ? body : Buffer.from(body ?? "");
+  }
+
+  async arrayBuffer() {
+    return this.bytes.buffer.slice(
+      this.bytes.byteOffset,
+      this.bytes.byteOffset + this.bytes.byteLength,
+    );
+  }
+}
+
+class TestAbortSignal {
+  static timeout() {
+    return undefined;
+  }
+}
 
 function makeRequest({ url, method = "GET", headers = {}, body } = {}) {
   return {
@@ -34,6 +79,9 @@ describe("Tasknote Preview API proxy", () => {
   beforeEach(() => {
     vi.stubEnv("TASKNOTE_API_UPSTREAM", UPSTREAM);
     vi.stubEnv("TASKNOTE_API_BYPASS_SECRET", "test-only-secret");
+    vi.stubGlobal("Headers", TestHeaders);
+    vi.stubGlobal("Response", TestResponse);
+    vi.stubGlobal("AbortSignal", TestAbortSignal);
     vi.stubGlobal("fetch", vi.fn());
   });
 
