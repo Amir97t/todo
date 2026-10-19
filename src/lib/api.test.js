@@ -241,6 +241,40 @@ describe("authentication requests", () => {
     );
   });
 
+  it("sends the CSRF cookie value as a header on state-changing resource requests", async () => {
+    vi.stubEnv("VITE_API_URL", window.location.origin);
+    document.cookie = "csrfToken=csrf-for-resource; Path=/";
+    setAccessToken("access-for-resource");
+    fetchMock.mockResolvedValueOnce(jsonResponse({ id: "list-1", name: "Work" }));
+
+    await request("/lists", { method: "POST", body: { name: "Work" } });
+
+    expect(fetchMock).toHaveBeenCalledWith(
+      `${window.location.origin}/api/v1/lists`,
+      expect.objectContaining({
+        method: "POST",
+        credentials: "same-origin",
+        headers: expect.objectContaining({
+          Authorization: "Bearer access-for-resource",
+          "X-CSRF-Token": "csrf-for-resource",
+        }),
+      }),
+    );
+
+    document.cookie = "csrfToken=; Max-Age=0; Path=/";
+  });
+
+  it("does not add a CSRF header to safe requests", async () => {
+    vi.stubEnv("VITE_API_URL", window.location.origin);
+    document.cookie = "csrfToken=csrf-for-resource; Path=/";
+    fetchMock.mockResolvedValueOnce(jsonResponse([]));
+
+    await request("/lists");
+
+    expect(fetchMock.mock.calls[0][1].headers["X-CSRF-Token"]).toBeUndefined();
+    document.cookie = "csrfToken=; Max-Age=0; Path=/";
+  });
+
   it("attaches the in-memory bearer token to protected API requests", async () => {
     fetchMock.mockResolvedValueOnce(jsonResponse({ id: "list-1" }));
     setAccessToken("access-2");

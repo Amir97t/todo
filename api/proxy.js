@@ -60,10 +60,14 @@ function resolveProxyPath(reqUrl) {
   return targetUrl;
 }
 
-function filterForwardedCookies(cookieHeader) {
+function filterForwardedCookies(cookieHeader, { includeRefreshToken = false } = {}) {
   if (typeof cookieHeader !== "string" || cookieHeader.length === 0) {
     return "";
   }
+
+  const allowedNames = includeRefreshToken
+    ? new Set(["csrfToken", "refreshToken"])
+    : new Set(["csrfToken"]);
 
   return cookieHeader
     .split(";")
@@ -73,9 +77,9 @@ function filterForwardedCookies(cookieHeader) {
       if (separator <= 0) return false;
 
       const name = part.slice(0, separator).trim();
-      // The frontend's deployment-protection session must not leave this
-      // origin. The API only needs Tasknote's refresh/CSRF cookies.
-      return !/(vercel|sso)/i.test(name);
+      // Forward only the app cookies required by this API route. Vercel SSO
+      // state and unrelated browser cookies stay on the frontend origin.
+      return allowedNames.has(name);
     })
     .join("; ");
 }
@@ -152,10 +156,12 @@ export default async function handler(req, res) {
     if (typeof value !== "string" || value.length === 0) continue;
 
     if (name === "cookie") {
-      // Bearer auth protects data endpoints. Only forward app cookies when
-      // the upstream auth routes need refresh/CSRF cookies.
-      if (!isAuthEndpoint) continue;
-      const appCookies = filterForwardedCookies(value);
+      // Resource mutations need the double-submit CSRF cookie. The refresh
+      // cookie is only needed by auth routes; Vercel's own cookies are never
+      // sent to the upstream API.
+      const appCookies = filterForwardedCookies(value, {
+        includeRefreshToken: isAuthEndpoint,
+      });
       if (appCookies) headers.set(name, appCookies);
       continue;
     }

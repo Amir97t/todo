@@ -48,6 +48,26 @@ export function buildUrl(path, params) {
   return `${resolveBaseUrl()}${API_PREFIX}${path}${toQueryString(params)}`;
 }
 
+function readCsrfTokenCookie() {
+  if (typeof document === "undefined" || typeof document.cookie !== "string") {
+    return null;
+  }
+
+  const entry = document.cookie
+    .split(";")
+    .map((part) => part.trim())
+    .find((part) => part.startsWith("csrfToken="));
+
+  if (!entry) return null;
+
+  const rawValue = entry.slice("csrfToken=".length);
+  try {
+    return decodeURIComponent(rawValue);
+  } catch {
+    return rawValue;
+  }
+}
+
 function defaultCredentialsFor(url) {
   if (typeof window === "undefined" || !window.location?.origin) {
     return "omit";
@@ -124,7 +144,13 @@ async function performRequest(
     if (token && !path.startsWith("/auth/")) {
       headers.Authorization = `Bearer ${token}`;
     }
-    if (csrfToken) headers["X-CSRF-Token"] = csrfToken;
+
+    const normalizedMethod = method.toUpperCase();
+    const isStateChangingMethod = !["GET", "HEAD", "OPTIONS"].includes(normalizedMethod);
+    const requestCsrfToken = csrfToken ?? (isStateChangingMethod ? readCsrfTokenCookie() : null);
+    if (requestCsrfToken) {
+      headers["X-CSRF-Token"] = requestCsrfToken;
+    }
 
     response = await fetch(url, {
       method,

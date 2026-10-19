@@ -106,7 +106,7 @@ describe("Tasknote Preview API proxy", () => {
       url: "/api/proxy?__proxyPath=auth/csrf&source=web",
       headers: {
         origin: "https://tasknote-web.example",
-        cookie: "session=test; _vercel_sso_nonce=private; vercel_session=private",
+        cookie: "csrfToken=csrf-test; refreshToken=refresh-test; session=test; _vercel_sso_nonce=private; vercel_session=private",
       },
     });
     const res = makeResponse();
@@ -118,7 +118,9 @@ describe("Tasknote Preview API proxy", () => {
     expect(new URL(calledUrl).searchParams.get("source")).toBe("web");
     expect(options.headers.get("x-vercel-protection-bypass")).toBe("test-only-secret");
     expect(options.headers.get("origin")).toBe("https://tasknote-web.example");
-    expect(options.headers.get("cookie")).toBe("session=test");
+    expect(options.headers.get("cookie")).toBe(
+      "csrfToken=csrf-test; refreshToken=refresh-test",
+    );
     expect(res.statusCode).toBe(200);
     expect(res.getHeader("set-cookie")).toEqual([
       "csrfToken=test-csrf; Path=/; Secure; SameSite=None",
@@ -151,13 +153,13 @@ describe("Tasknote Preview API proxy", () => {
     expect(res.statusCode).toBe(201);
   });
 
-  it("does not forward browser or Vercel cookies to non-auth API routes", async () => {
+  it("forwards only the CSRF cookie to resource routes, never refresh or Vercel cookies", async () => {
     fetch.mockResolvedValue(new Response(JSON.stringify([]), { status: 200 }));
 
     const req = makeRequest({
       url: "/api/proxy?__proxyPath=lists",
       headers: {
-        cookie: "refreshToken=private; csrfToken=private; _vercel_sso_nonce=private",
+        cookie: "refreshToken=private; csrfToken=csrf-safe; _vercel_sso_nonce=private; session=unrelated",
         authorization: "Bearer access-token",
       },
     });
@@ -166,8 +168,33 @@ describe("Tasknote Preview API proxy", () => {
     await handler(req, res);
 
     const [, options] = fetch.mock.calls[0];
-    expect(options.headers.get("cookie")).toBeNull();
+    expect(options.headers.get("cookie")).toBe("csrfToken=csrf-safe");
     expect(options.headers.get("authorization")).toBe("Bearer access-token");
+    expect(res.statusCode).toBe(200);
+  });
+
+  it("forwards refresh and CSRF cookies only to auth endpoints", async () => {
+    fetch.mockResolvedValue(new Response(JSON.stringify({ ok: true }), { status: 200 }));
+
+    const req = makeRequest({
+      url: "/api/proxy?__proxyPath=auth/logout",
+      method: "POST",
+      headers: {
+        cookie: "refreshToken=refresh-secret; csrfToken=csrf-safe; _vercel_sso_nonce=private; session=unrelated",
+        "x-csrf-token": "csrf-safe",
+        origin: "https://tasknote-web.example",
+      },
+      body: JSON.stringify({}),
+    });
+    const res = makeResponse();
+
+    await handler(req, res);
+
+    const [, options] = fetch.mock.calls[0];
+    expect(options.headers.get("cookie")).toBe(
+      "refreshToken=refresh-secret; csrfToken=csrf-safe",
+    );
+    expect(options.headers.get("x-csrf-token")).toBe("csrf-safe");
     expect(res.statusCode).toBe(200);
   });
 
