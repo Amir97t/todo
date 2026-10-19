@@ -77,12 +77,15 @@ export default function TaskChecklist({
     setEditText(item.text);
   }
 
-  function handleSaveEdit() {
+  async function handleSaveEdit() {
     const text = editText.trim();
 
     if (!text || !editingId) return;
 
-    onEdit(editingId, text);
+    // Keep the editor and typed text available if persistence fails.
+    const saved = await onEdit(editingId, text);
+    if (!saved) return;
+
     setEditingId(null);
     setEditText("");
   }

@@ -343,6 +343,39 @@ describe("checklist actions", () => {
     expect(currentChecklist()).toHaveLength(2);
   });
 
+  it("keeps checklist editing open after failure and closes after a successful retry", async () => {
+    await bootWithChecklist();
+
+    fireEvent.click(
+      await screen.findByRole("button", { name: 'Edit "Step one"' }),
+    );
+    const editInput = await screen.findByRole("textbox", { name: 'Edit "Step one"' });
+    fireEvent.change(editInput, { target: { value: "Retry rename" } });
+
+    const originalUpdate = fakeApi.checklist.update;
+    fakeApi.checklist.update = async () => {
+      throw new Error("Temporary save failure");
+    };
+
+    try {
+      fireEvent.click(screen.getByRole("button", { name: "Save checklist item" }));
+
+      await waitFor(() => expect(screen.getByRole("alert")).toBeTruthy());
+      expect(screen.getByRole("textbox", { name: 'Edit "Step one"' }).value).toBe(
+        "Retry rename",
+      );
+      expect(currentChecklist()[0].text).toBe("Step one");
+    } finally {
+      fakeApi.checklist.update = originalUpdate;
+    }
+
+    fireEvent.click(screen.getByRole("button", { name: "Save checklist item" }));
+    await waitFor(() => expect(currentChecklist()[0].text).toBe("Retry rename"));
+    await waitFor(() =>
+      expect(screen.queryByRole("textbox", { name: 'Edit "Retry rename"' })).toBeNull(),
+    );
+  });
+
   it("deletes a checklist item and keeps the remaining order", async () => {
     await bootWithChecklist();
 

@@ -135,7 +135,7 @@ export default function TaskItem({
   }
 
   function handleEditChecklistItem(itemId, text) {
-    updateChecklistItem(task.id, itemId, { text });
+    return updateChecklistItem(task.id, itemId, { text });
   }
 
   if (isEditing) {
