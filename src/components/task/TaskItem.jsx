@@ -127,7 +127,7 @@ export default function TaskItem({
   }
 
   function handleAddChecklistItem(text) {
-    addChecklistItem(task.id, text);
+    return addChecklistItem(task.id, text);
   }
 
   function handleDeleteChecklistItem(itemId) {

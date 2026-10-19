@@ -153,6 +153,27 @@ describe("Tasknote Preview API proxy", () => {
     expect(res.statusCode).toBe(201);
   });
 
+  it("strips the Vercel rewrite path capture while preserving task filters", async () => {
+    fetch.mockResolvedValue(new Response(JSON.stringify([]), { status: 200 }));
+
+    const listId = "00000000-0000-4000-8000-000000000001";
+    const req = makeRequest({
+      url: `/api/proxy?__proxyPath=tasks&path=tasks&listId=${listId}&completed=false&sort=newest`,
+    });
+    const res = makeResponse();
+
+    await handler(req, res);
+
+    const [calledUrl] = fetch.mock.calls[0];
+    const upstreamUrl = new URL(calledUrl);
+    expect(upstreamUrl.pathname).toBe("/api/v1/tasks");
+    expect(upstreamUrl.searchParams.has("path")).toBe(false);
+    expect(upstreamUrl.searchParams.get("listId")).toBe(listId);
+    expect(upstreamUrl.searchParams.get("completed")).toBe("false");
+    expect(upstreamUrl.searchParams.get("sort")).toBe("newest");
+    expect(res.statusCode).toBe(200);
+  });
+
   it("forwards only the CSRF cookie to resource routes, never refresh or Vercel cookies", async () => {
     fetch.mockResolvedValue(new Response(JSON.stringify([]), { status: 200 }));
 

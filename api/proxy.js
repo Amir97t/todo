@@ -52,7 +52,9 @@ function resolveProxyPath(reqUrl) {
   const targetUrl = new URL(API_PREFIX + proxyPath, "https://" + ALLOWED_UPSTREAM_HOST);
 
   for (const [key, value] of incomingUrl.searchParams.entries()) {
-    if (key !== "__proxyPath") {
+    // Vercel can expose the catch-all rewrite capture as "path" alongside
+    // __proxyPath. That is routing metadata, not a backend query parameter.
+    if (key !== "__proxyPath" && key !== "path") {
       targetUrl.searchParams.append(key, value);
     }
   }

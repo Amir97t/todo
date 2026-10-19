@@ -297,6 +297,12 @@ describe("checklist actions", () => {
     fireEvent.click(screen.getByRole("button", { name: "Add checklist item" }));
 
     await waitFor(() => expect(currentChecklist()).toHaveLength(3));
+    await waitFor(() =>
+      expect(screen.queryByLabelText("New checklist item")).toBeNull(),
+    );
+    expect(
+      screen.getByRole("button", { name: "Add checklist item" }),
+    ).toBeTruthy();
 
     const rows = currentChecklist();
     expect(rows.map((item) => item.text)).toEqual([
