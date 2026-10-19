@@ -30,6 +30,7 @@ export default function Inbox({
   dataStatus = "ready",
   dataError = null,
   onRetry,
+  onSignOut,
 }) {
   const [editingId, setEditingId] = useState(null);
   const [islandOpen, setIslandOpen] = useState(false);
@@ -80,6 +81,7 @@ export default function Inbox({
         renameList={renameList}
         deleteList={deleteList}
         isPending={isPending}
+        onSignOut={onSignOut}
       />
       <main className="min-h-screen min-w-0 flex-1">
         <div className="w-full min-w-0 px-4 pb-10 sm:px-6 lg:px-8 lg:pt-8">

@@ -229,6 +229,18 @@ describe("authentication requests", () => {
     expect(getAccessToken()).toBe("access-1");
   });
 
+  it("uses same-origin credentials for requests routed through the Preview proxy", async () => {
+    vi.stubEnv("VITE_API_URL", window.location.origin);
+    fetchMock.mockResolvedValueOnce(jsonResponse([{ id: "list-1" }]));
+
+    await request("/lists");
+
+    expect(fetchMock).toHaveBeenCalledWith(
+      `${window.location.origin}/api/v1/lists`,
+      expect.objectContaining({ credentials: "same-origin" }),
+    );
+  });
+
   it("attaches the in-memory bearer token to protected API requests", async () => {
     fetchMock.mockResolvedValueOnce(jsonResponse({ id: "list-1" }));
     setAccessToken("access-2");

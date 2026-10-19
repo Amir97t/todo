@@ -46,24 +46,19 @@ export default function App() {
           {logoutError}
         </div>
       )}
-      <button
-        type="button"
-        onClick={() => {
+      <AuthenticatedApp
+        onSignOut={() => {
           setLogoutError("");
           void logout().catch((cause) => {
             setLogoutError(cause?.message || "Sign out could not be completed.");
           });
         }}
-        className="fixed right-4 top-4 z-40 rounded-xl border border-white/10 bg-slate-950/75 px-4 py-2 text-sm font-medium text-slate-200 shadow-lg backdrop-blur hover:bg-slate-900"
-      >
-        Sign out
-      </button>
-      <AuthenticatedApp />
+      />
     </>
   );
 }
 
-function AuthenticatedApp() {
+function AuthenticatedApp({ onSignOut }) {
   const {
     status,
     error,
@@ -99,6 +94,7 @@ function AuthenticatedApp() {
         dataStatus={status}
         dataError={error}
         onRetry={retry}
+        onSignOut={onSignOut}
       />
     </>
   );

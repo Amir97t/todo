@@ -104,7 +104,10 @@ describe("Tasknote Preview API proxy", () => {
 
     const req = makeRequest({
       url: "/api/proxy?__proxyPath=auth/csrf&source=web",
-      headers: { origin: "https://tasknote-web.example", cookie: "session=test" },
+      headers: {
+        origin: "https://tasknote-web.example",
+        cookie: "session=test; _vercel_sso_nonce=private; vercel_session=private",
+      },
     });
     const res = makeResponse();
 
@@ -146,6 +149,26 @@ describe("Tasknote Preview API proxy", () => {
     expect(Buffer.from(options.body).toString("utf8")).toBe(body);
     expect(options.headers.get("x-csrf-token")).toBe("test-csrf");
     expect(res.statusCode).toBe(201);
+  });
+
+  it("does not forward browser or Vercel cookies to non-auth API routes", async () => {
+    fetch.mockResolvedValue(new Response(JSON.stringify([]), { status: 200 }));
+
+    const req = makeRequest({
+      url: "/api/proxy?__proxyPath=lists",
+      headers: {
+        cookie: "refreshToken=private; csrfToken=private; _vercel_sso_nonce=private",
+        authorization: "Bearer access-token",
+      },
+    });
+    const res = makeResponse();
+
+    await handler(req, res);
+
+    const [, options] = fetch.mock.calls[0];
+    expect(options.headers.get("cookie")).toBeNull();
+    expect(options.headers.get("authorization")).toBe("Bearer access-token");
+    expect(res.statusCode).toBe(200);
   });
 
   it("rejects unsafe paths without sending an upstream request", async () => {

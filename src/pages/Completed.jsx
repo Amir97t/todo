@@ -27,6 +27,7 @@ export default function Completed({
   dataStatus = "ready",
   dataError = null,
   onRetry,
+  onSignOut,
 }) {
   const [search, setSearch] = useState("");
   const [filter, setFilter] = useState("newest");
@@ -71,6 +72,7 @@ export default function Completed({
         renameList={renameList}
         deleteList={deleteList}
         isPending={isPending}
+        onSignOut={onSignOut}
       />
 
       <main className="min-h-screen min-w-0 flex-1">

@@ -10,7 +10,7 @@ const lists = [
   { id: "l1", name: "Work", icon: "briefcase" },
 ];
 
-function renderSidebar(renameList) {
+function renderSidebar(renameList, onSignOut) {
   return render(
     <Sidebar
       lists={lists}
@@ -19,6 +19,7 @@ function renderSidebar(renameList) {
       addList={vi.fn()}
       renameList={renameList}
       deleteList={vi.fn()}
+      onSignOut={onSignOut}
     />,
   );
 }
@@ -45,6 +46,17 @@ describe("Sidebar rename async contract", () => {
     // from the id matching the production constant.
     expect(screen.getByRole("button", { name: "Rename Work" })).toBeTruthy();
     expect(screen.getByRole("button", { name: "Delete Work" })).toBeTruthy();
+  });
+
+  it("places sign out in the sidebar and calls the supplied handler", () => {
+    const onSignOut = vi.fn();
+
+    renderSidebar(vi.fn().mockResolvedValue(true), onSignOut);
+
+    const signOutButtons = screen.getAllByRole("button", { name: "Sign out" });
+    expect(signOutButtons.length).toBeGreaterThan(0);
+    fireEvent.click(signOutButtons[0]);
+    expect(onSignOut).toHaveBeenCalledTimes(1);
   });
 
   it("leaves edit mode when renameList resolves true", async () => {

@@ -60,6 +60,26 @@ function resolveProxyPath(reqUrl) {
   return targetUrl;
 }
 
+function filterForwardedCookies(cookieHeader) {
+  if (typeof cookieHeader !== "string" || cookieHeader.length === 0) {
+    return "";
+  }
+
+  return cookieHeader
+    .split(";")
+    .map((part) => part.trim())
+    .filter((part) => {
+      const separator = part.indexOf("=");
+      if (separator <= 0) return false;
+
+      const name = part.slice(0, separator).trim();
+      // The frontend's deployment-protection session must not leave this
+      // origin. The API only needs Tasknote's refresh/CSRF cookies.
+      return !/(vercel|sso)/i.test(name);
+    })
+    .join("; ");
+}
+
 async function readRequestBody(req) {
   const chunks = [];
   let totalBytes = 0;
@@ -125,11 +145,22 @@ export default async function handler(req, res) {
   }
 
   const headers = new Headers();
+  const isAuthEndpoint = targetUrl.pathname.startsWith(`${API_PREFIX}auth/`);
+
   for (const name of REQUEST_HEADER_ALLOWLIST) {
     const value = req.headers?.[name];
-    if (typeof value === "string" && value.length > 0) {
-      headers.set(name, value);
+    if (typeof value !== "string" || value.length === 0) continue;
+
+    if (name === "cookie") {
+      // Bearer auth protects data endpoints. Only forward app cookies when
+      // the upstream auth routes need refresh/CSRF cookies.
+      if (!isAuthEndpoint) continue;
+      const appCookies = filterForwardedCookies(value);
+      if (appCookies) headers.set(name, appCookies);
+      continue;
     }
+
+    headers.set(name, value);
   }
 
   // The browser talks to this frontend origin. Preserve Origin for the

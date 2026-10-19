@@ -16,6 +16,7 @@ export default function Router({
   dataStatus,
   dataError,
   onRetry,
+  onSignOut,
 }) {
   const shared = {
     tasks,
@@ -31,6 +32,7 @@ export default function Router({
     dataStatus,
     dataError,
     onRetry,
+    onSignOut,
   };
 
   return (

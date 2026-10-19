@@ -48,6 +48,20 @@ export function buildUrl(path, params) {
   return `${resolveBaseUrl()}${API_PREFIX}${path}${toQueryString(params)}`;
 }
 
+function defaultCredentialsFor(url) {
+  if (typeof window === "undefined" || !window.location?.origin) {
+    return "omit";
+  }
+
+  try {
+    return new URL(url, window.location.href).origin === window.location.origin
+      ? "same-origin"
+      : "omit";
+  } catch {
+    return "omit";
+  }
+}
+
 function safeParse(text) {
   try {
     return JSON.parse(text);
@@ -80,7 +94,7 @@ async function performRequest(
     query,
     timeoutMs = DEFAULT_TIMEOUT_MS,
     signal,
-    credentials = "omit",
+    credentials,
     csrfToken,
   } = {},
 ) {
@@ -116,7 +130,7 @@ async function performRequest(
       method,
       headers,
       body: body === undefined ? undefined : JSON.stringify(body),
-      credentials,
+      credentials: credentials ?? defaultCredentialsFor(url),
       signal: controller.signal,
     });
   } catch {

@@ -7,6 +7,7 @@ import useDialogFocus from "../../hooks/useDialogFocus";
 import {
   BookMarked,
   BookOpen,
+  LogOut,
   PanelLeftClose,
   PanelLeftOpen,
   Plus,
@@ -62,6 +63,7 @@ export default function Sidebar({
   renameList,
   deleteList,
   isPending,
+  onSignOut,
 }) {
   const [editingId, setEditingId] = useState(null);
   const [deleteTarget, setDeleteTarget] = useState(null);
@@ -284,6 +286,17 @@ export default function Sidebar({
               }}
             >
               <NewListForm onSave={addList} isPending={isPending} />
+              {onSignOut && (
+                <button
+                  type="button"
+                  onClick={onSignOut}
+                  className="mt-3 inline-flex min-h-10 w-full items-center justify-center gap-2 rounded-lg border px-3 text-sm font-semibold transition hover:bg-rose-500/10 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-rose-500"
+                  style={{ borderColor: "var(--border)", color: "#be123c" }}
+                >
+                  <LogOut size={15} aria-hidden="true" />
+                  Sign out
+                </button>
+              )}
             </div>
           </div>
         </div>
@@ -413,6 +426,17 @@ export default function Sidebar({
                 >
                   <Plus size={14} aria-hidden="true" />
                 </button>
+                {onSignOut && (
+                  <button
+                    type="button"
+                    onClick={onSignOut}
+                    aria-label="Sign out"
+                    title="Sign out"
+                    className="inline-flex h-9 w-9 items-center justify-center rounded-xl border border-rose-200/30 bg-rose-500/10 text-rose-100 transition hover:bg-rose-500/20 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-rose-400"
+                  >
+                    <LogOut size={15} aria-hidden="true" />
+                  </button>
+                )}
               </div>
             </div>
           ) : (
@@ -515,6 +539,17 @@ export default function Sidebar({
                 }}
               >
                 <NewListForm onSave={addList} isPending={isPending} />
+                {onSignOut && (
+                  <button
+                    type="button"
+                    onClick={onSignOut}
+                    className="mt-3 inline-flex min-h-10 w-full items-center justify-center gap-2 rounded-lg border px-3 text-sm font-semibold transition hover:bg-rose-500/10 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-rose-500"
+                    style={{ borderColor: "var(--border)", color: "#be123c" }}
+                  >
+                    <LogOut size={15} aria-hidden="true" />
+                    Sign out
+                  </button>
+                )}
               </div>
             </div>
           )}
