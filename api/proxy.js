@@ -1,3 +1,6 @@
+import { Buffer } from "node:buffer";
+import process from "node:process";
+
 const API_PREFIX = "/api/v1/";
 const ALLOWED_UPSTREAM_HOST =
   "tasknote-api-git-feat-auth-cors-d68308-amirs-projects-16941eb8.vercel.app";
