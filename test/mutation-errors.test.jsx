@@ -1,4 +1,4 @@
-import { act, render, renderHook, screen, fireEvent, waitFor } from "@testing-library/react";
+import { act, render, renderHook, screen, fireEvent, waitFor, within } from "@testing-library/react";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import App from "../src/App.jsx";
 import ThemeProvider from "../src/context/ThemeProvider.jsx";
@@ -348,6 +348,102 @@ describe("error surface in the app", () => {
   });
 });
 
+
+describe("error surface over the mobile drawer", () => {
+  async function boot() {
+    localStorage.setItem("todo-app-sidebar-collapsed", JSON.stringify(false));
+    const view = render(
+      <ThemeProvider>
+        <App />
+      </ThemeProvider>,
+    );
+    await waitFor(() => expect(lastTaskQuery.value?.sort).toBeDefined());
+    return view;
+  }
+
+  // The mobile trigger is the only "Open notebook" button outside the
+  // desktop aside, which carries the same label when it is collapsed.
+  function mobileTrigger() {
+    return [...document.querySelectorAll('button[aria-label="Open notebook"]')].find(
+      (button) => !button.closest("aside"),
+    );
+  }
+
+  // Tailwind writes the stacking order into the class list, so the layer
+  // that must win is readable from the class name.
+  function zIndexOf(node) {
+    for (const name of node.classList) {
+      const match = /^z-\[(\d+)\]$/.exec(name) || /^z-(\d+)$/.exec(name);
+      if (match) return Number(match[1]);
+    }
+    return null;
+  }
+
+  async function failFromTheDrawer(drawer) {
+    fireEvent.click(within(drawer).getByRole("button", { name: "+ New List" }));
+    fireEvent.change(within(drawer).getByPlaceholderText("List name..."), {
+      target: { value: "Inbox" },
+    });
+    fireEvent.click(within(drawer).getByRole("button", { name: "Save" }));
+    return screen.findByRole("alert");
+  }
+
+  it("reports the failure above the open drawer instead of behind it", async () => {
+    reset();
+    await boot();
+
+    // The closed drawer is the only element carrying `inert`.
+    const drawer = document.querySelector("div[inert]");
+    expect(drawer).not.toBeNull();
+
+    const trigger = mobileTrigger();
+    fireEvent.click(trigger);
+    await waitFor(() => expect(drawer.hasAttribute("inert")).toBe(false));
+
+    const alert = await failFromTheDrawer(drawer);
+    expect(alert.textContent).toContain("A list with this name already exists.");
+
+    // One notification, not one per layer.
+    expect(screen.getAllByRole("alert")).toHaveLength(1);
+
+    // The notification is a fixed layer of its own, painted above the drawer
+    // and its backdrop, and it is not part of the drawer's subtree.
+    const layer = alert.parentElement;
+    expect(layer.classList.contains("fixed")).toBe(true);
+    expect(zIndexOf(layer)).toBeGreaterThan(zIndexOf(drawer));
+    expect(drawer.contains(alert)).toBe(false);
+
+    // The drawer stays open: the failure is reported rather than hidden by
+    // closing the drawer.
+    expect(drawer.hasAttribute("inert")).toBe(false);
+  });
+
+  it("keeps the failure out of the page flow so nothing is displaced", async () => {
+    reset();
+    const { container } = await boot();
+
+    const drawer = document.querySelector("div[inert]");
+    fireEvent.click(mobileTrigger());
+    await waitFor(() => expect(drawer.hasAttribute("inert")).toBe(false));
+
+    const trigger = mobileTrigger();
+    const triggerClasses = [...trigger.classList];
+    // Everything the app renders into the page, so an element joining the
+    // flow (as an in-flow banner does) is visible as a change here.
+    const flowChildren = container.children.length;
+
+    await failFromTheDrawer(drawer);
+
+    // The notification is rendered into the body, not into the app shell, so
+    // it neither shifts the page nor moves the sidebar toggle.
+    expect(container.contains(screen.getByRole("alert"))).toBe(false);
+    expect(container.children.length).toBe(flowChildren);
+
+    // The toggle is the very same element, still positioned the same way.
+    expect(mobileTrigger()).toBe(trigger);
+    expect([...trigger.classList]).toEqual(triggerClasses);
+  });
+});
 
 vi.mock("../src/lib/authSession.js", async () => {
   const actual = await vi.importActual("../src/lib/authSession.js");
