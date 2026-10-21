@@ -1,179 +1,101 @@
+import { useState } from "react";
 import Router from "./routes/Router";
-import useLocalStorage from "./hooks/useLocalStorage";
+import useAppData from "./hooks/useAppData";
+import CelestialBackground from "./components/common/CelestialBackground";
+import MutationErrorBanner from "./components/common/MutationErrorBanner";
+import AuthScreen from "./components/auth/AuthScreen.jsx";
+import { useAuth } from "./context/AuthContext.js";
 
-const LISTS_STORAGE_KEY = "todo-app-lists";
-const TASKS_STORAGE_KEY = "todo-app-tasks";
-const SELECTED_LIST_STORAGE_KEY = "todo-app-selected-list";
-
-const DEFAULT_LISTS = [
-  {
-    id: "inbox",
-    name: "Inbox",
-  },
-];
-
-const DEFAULT_TASKS = [];
-
-export default function App() {
-  // App owns application data; persistence is handled by useLocalStorage.
-  const [lists, setLists] = useLocalStorage(LISTS_STORAGE_KEY, DEFAULT_LISTS);
-
-  const [tasks, setTasks] = useLocalStorage(TASKS_STORAGE_KEY, DEFAULT_TASKS);
-
-  const [selectedListId, setSelectedListId] = useLocalStorage(
-    SELECTED_LIST_STORAGE_KEY,
-    "inbox",
-  );
-
-  function addList(name) {
-    const trimmed = name.trim();
-
-    if (!trimmed) return false;
-
-    const exists = lists.some(
-      (list) => list.name.toLowerCase() === trimmed.toLowerCase(),
-    );
-
-    if (exists) return false;
-
-    const newList = {
-      id: crypto.randomUUID(),
-      name: trimmed,
-    };
-
-    setLists((prev) => [...prev, newList]);
-    setSelectedListId(newList.id);
-
-    return true;
-  }
-
-  function renameList(id, name) {
-    const trimmed = name.trim();
-
-    if (!trimmed) return false;
-
-    const exists = lists.some(
-      (list) =>
-        list.id !== id && list.name.toLowerCase() === trimmed.toLowerCase(),
-    );
-
-    if (exists) return false;
-
-    setLists((prev) =>
-      prev.map((list) =>
-        list.id === id
-          ? {
-              ...list,
-              name: trimmed,
-            }
-          : list,
-      ),
-    );
-
-    return true;
-  }
-
-  function deleteList(id, deleteTasks = false) {
-    // App owns destructive operations because it owns the source data.
-    if (id === "inbox") return;
-
-    if (deleteTasks) {
-      setTasks((prev) => prev.filter((task) => task.listId !== id));
-    } else {
-      setTasks((prev) =>
-        prev.map((task) =>
-          task.listId === id
-            ? {
-                ...task,
-                listId: "inbox",
-              }
-            : task,
-        ),
-      );
-    }
-
-    setLists((prev) => prev.filter((list) => list.id !== id));
-
-    if (selectedListId === id) {
-      setSelectedListId("inbox");
-    }
-  }
-
-  function addTask(title, description, checklist, listId) {
-    const trimmedTitle = title.trim();
-
-    if (!trimmedTitle) return;
-
-    const listExists = lists.some((list) => list.id === listId);
-    if (!listExists) return;
-    const newTask = {
-      id: crypto.randomUUID(),
-      title: trimmedTitle,
-      description: description.trim(),
-      checklist,
-      listId,
-      completed: false,
-      createdAt: Date.now(),
-    };
-
-    setTasks((prev) => [...prev, newTask]);
-  }
-
-  function deleteTask(id) {
-    setTasks((prev) => prev.filter((task) => task.id !== id));
-  }
-
-  function toggleTask(id) {
-    setTasks((prev) =>
-      prev.map((task) =>
-        task.id === id
-          ? {
-              ...task,
-              completed: !task.completed,
-            }
-          : task,
-      ),
-    );
-  }
-
-function editTask(id, updatedTask) {
-  if (updatedTask.listId) {
-    const listExists = lists.some(
-      (list) => list.id === updatedTask.listId,
-    );
-
-    if (!listExists) return;
-  }
-
-  setTasks((prev) =>
-    prev.map((task) =>
-      task.id === id
-        ? {
-            ...task,
-            ...updatedTask,
-          }
-        : task,
-    ),
+function LoadingScreen() {
+  return (
+    <main className="relative z-10 flex min-h-screen items-center justify-center px-4">
+      <div role="status" className="rounded-2xl border border-white/10 bg-slate-950/70 px-6 py-5 text-sm text-slate-300 shadow-xl">
+        Restoring your secure session…
+      </div>
+    </main>
   );
 }
 
-  const taskActions = {
-    addTask,
-    deleteTask,
-    toggleTask,
-    editTask,
-  };
+export default function App() {
+  const { status, isAuthenticated, logout } = useAuth();
+  const [logoutError, setLogoutError] = useState("");
+
+  if (status === "checking") {
+    return (
+      <>
+        <CelestialBackground />
+        <LoadingScreen />
+      </>
+    );
+  }
+
+  if (!isAuthenticated) {
+    return (
+      <>
+        <CelestialBackground />
+        <AuthScreen />
+      </>
+    );
+  }
 
   return (
-    <Router
-      tasks={tasks}
-      taskActions={taskActions}
-      lists={lists}
-      addList={addList}
-      renameList={renameList}
-      deleteList={deleteList}
-      selectedListId={selectedListId}
-      setSelectedListId={setSelectedListId}
-    />
+    <>
+      <CelestialBackground />
+      {logoutError && (
+        <div role="alert" className="fixed right-4 top-4 z-50 rounded-xl border border-rose-400/20 bg-slate-950/95 px-4 py-3 text-sm text-rose-200 shadow-xl">
+          {logoutError}
+        </div>
+      )}
+      <AuthenticatedApp
+        onSignOut={() => {
+          setLogoutError("");
+          void logout().catch((cause) => {
+            setLogoutError(cause?.message || "Sign out could not be completed.");
+          });
+        }}
+      />
+    </>
+  );
+}
+
+function AuthenticatedApp({ onSignOut }) {
+  const {
+    status,
+    error,
+    retry,
+    isPending,
+    actionError,
+    clearActionError,
+    lists,
+    tasks,
+    taskActions,
+    addList,
+    renameList,
+    deleteList,
+    selectedListId,
+    setSelectedListId,
+    setTaskQuery,
+  } = useAppData();
+
+  return (
+    <>
+      <MutationErrorBanner message={actionError} onDismiss={clearActionError} />
+      <Router
+        tasks={tasks}
+        taskActions={taskActions}
+        lists={lists}
+        addList={addList}
+        renameList={renameList}
+        deleteList={deleteList}
+        isPending={isPending}
+        selectedListId={selectedListId}
+        setSelectedListId={setSelectedListId}
+        setTaskQuery={setTaskQuery}
+        dataStatus={status}
+        dataError={error}
+        onRetry={retry}
+        onSignOut={onSignOut}
+      />
+    </>
   );
 }

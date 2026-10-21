@@ -1,13 +1,20 @@
-import { useState } from "react";
+import { useEffect, useRef, useState } from "react";
+import { FileText, Plus } from "lucide-react";
 import AddTaskCard from "../components/task/AddTaskCard";
+import AddTaskFab from "../components/task/AddTaskFab";
 import TaskList from "../components/task/TaskList";
 import Navbar from "../components/layout/Navbar";
-import useTaskFilter from "../hooks/useTaskFilter";
-import SearchBar from "../components/task/SearchBar";
 import TaskCounter from "../components/task/TaskCounter";
 import FilterBar from "../components/task/FilterBar";
 import EmptyState from "../components/common/EmptyState";
 import Sidebar from "../components/layout/Sidebar";
+import { buildTaskQuery } from "../lib/taskQuery";
+import { mutationKeys } from "../lib/mutationKeys";
+
+const SEARCH_DEBOUNCE_MS =
+  typeof globalThis !== "undefined" && globalThis.process?.env?.VITEST
+    ? 0
+    : 250;
 
 export default function Inbox({
   tasks,
@@ -18,32 +25,54 @@ export default function Inbox({
   addList,
   renameList,
   deleteList,
+  isPending,
+  setTaskQuery,
+  dataStatus = "ready",
+  dataError = null,
+  onRetry,
+  onSignOut,
 }) {
   const [editingId, setEditingId] = useState(null);
+  const [islandOpen, setIslandOpen] = useState(false);
   const { addTask } = taskActions;
-
   const [search, setSearch] = useState("");
   const [filter, setFilter] = useState("newest");
-  const activeTasks = useTaskFilter({
-    tasks,
-    completed: false,
-    selectedListId,
-    search,
-    filter,
-  });
 
-  const hasActiveTasks = search.trim()
-    ? tasks.some((task) => !task.completed)
-    : tasks.some((task) => !task.completed && task.listId === selectedListId);
+  // Debounced search query to reduce request volume while keeping the input
+  // immediately responsive. The local state updates on every keystroke; the
+  // server query is published after a short pause. Clearing the search
+  // updates promptly because the timeout is cleared on value change.
+  const debounceRef = useRef(null);
+  useEffect(() => {
+    if (debounceRef.current) {
+      clearTimeout(debounceRef.current);
+    }
+    debounceRef.current = setTimeout(() => {
+      setTaskQuery(
+        buildTaskQuery({
+          listId: selectedListId,
+          completed: false,
+          q: search,
+          sort: filter,
+        }),
+      );
+    }, SEARCH_DEBOUNCE_MS);
+    return () => {
+      if (debounceRef.current) {
+        clearTimeout(debounceRef.current);
+      }
+    };
+  }, [setTaskQuery, selectedListId, search, filter]);
 
   function handleAddTask(title, description, checklist) {
-    // Inbox supplies the active list context.
-    // AddTaskCard only manages task form data.
-    addTask(title, description, checklist, selectedListId);
+    // Returned so AddTaskCard can hold its dialog open while pending and only
+    // close once the task actually exists.
+    return addTask(title, description, checklist, selectedListId);
   }
-
+  const selectedListName =
+    lists.find((l) => l.id === selectedListId)?.name ?? "Inbox";
   return (
-    <main className="flex min-h-screen bg-zinc-950 text-white">
+    <div className="flex min-h-screen">
       <Sidebar
         lists={lists}
         selectedListId={selectedListId}
@@ -51,43 +80,95 @@ export default function Inbox({
         addList={addList}
         renameList={renameList}
         deleteList={deleteList}
+        isPending={isPending}
+        onSignOut={onSignOut}
       />
-      <div className="flex-1 p-8">
-        <div className="mx-auto max-w-4xl">
-          <Navbar />
-          <h1 className="mb-2 text-center text-4xl font-bold">Todo List</h1>
-          <p className="mb-8 text-center text-zinc-400">
-            Focus on your active tasks.
-          </p>
-
-          <AddTaskCard onAddTask={handleAddTask} />
-          <div className="mt-8">
-            <SearchBar value={search} onChange={setSearch} />
-            <div className="mb-4 flex items-center justify-between gap-4">
-              <TaskCounter total={activeTasks.length} label="Active" />
-              <FilterBar filter={filter} onChange={setFilter} />
+      <main className="min-h-screen min-w-0 flex-1">
+        <div className="w-full min-w-0 px-4 pb-10 sm:px-6 lg:px-8 lg:pt-8">
+          <div className="mx-auto min-w-0 max-w-350">
+            <Navbar
+              searchValue={search}
+              onSearchChange={setSearch}
+              onNewTask={() => setIslandOpen(true)}
+            />
+            <header className="mb-4 min-w-0 sm:mb-6">
+              <h1
+                className="truncate [font-family:var(--font-display)] text-xl font-bold tracking-tight sm:text-2xl lg:text-3xl"
+                style={{ color: "var(--text)" }}
+              >
+                {selectedListName}
+              </h1>
+              <p
+                className="mt-1.5 hidden max-w-xl text-xs leading-relaxed min-[400px]:block sm:text-sm"
+                style={{ color: "var(--text-muted)" }}
+              >
+                {search.trim()
+                  ? `Showing results for "${search.trim()}" across all lists.`
+                  : `Focus on your active tasks in ${selectedListName}.`}
+              </p>
+            </header>
+            <div className="space-y-6">
+              {dataStatus === "loading" ? (
+                <EmptyState
+                  title="Loading your tasks…"
+                  description="Fetching your data from the server."
+                />
+              ) : dataStatus === "error" ? (
+                <EmptyState
+                  title="Could not load your data"
+                  description={
+                    dataError || "Something went wrong while loading your data."
+                  }
+                  actionLabel="Try again"
+                  onAction={onRetry}
+                  showActionLabel
+                />
+              ) : (
+                <>
+                  <AddTaskCard
+                    onAddTask={handleAddTask}
+                    open={islandOpen}
+                    onOpenChange={setIslandOpen}
+                    pending={isPending(mutationKeys.createTask(selectedListId))}
+                  />
+                  <div className="space-y-4">
+                    <div className="flex flex-col items-start gap-3">
+                      <FilterBar filter={filter} onChange={setFilter} />
+                      <TaskCounter total={tasks.length} label="Active" />
+                    </div>
+                    {tasks.length === 0 ? (
+                      <EmptyState
+                        icon={search.trim() ? FileText : Plus}
+                        title={
+                          search.trim() ? "No matching tasks" : "No active tasks"
+                        }
+                        description={
+                          search.trim()
+                            ? "Try another search keyword or clear the search."
+                            : "Create your first task — it will appear on this paper."
+                        }
+                        actionLabel={search.trim() ? undefined : "Add task"}
+                        onAction={
+                          search.trim() ? undefined : () => setIslandOpen(true)
+                        }
+                      />
+                    ) : (
+                      <TaskList
+                        tasks={tasks}
+                        taskActions={taskActions}
+                        editingId={editingId}
+                        onStartEdit={setEditingId}
+                        isPending={isPending}
+                      />
+                    )}
+                  </div>
+                </>
+              )}
             </div>
-            {activeTasks.length === 0 ? (
-              <EmptyState
-                title={hasActiveTasks ? "No matching tasks" : "No active tasks"}
-                description={
-                  hasActiveTasks
-                    ? "Try another search keyword."
-                    : "Create your first task."
-                }
-              />
-            ) : (
-              <TaskList
-                title="Active Tasks"
-                tasks={activeTasks}
-                taskActions={taskActions}
-                editingId={editingId}
-                onStartEdit={setEditingId}
-              />
-            )}
           </div>
         </div>
-      </div>
-    </main>
+        <AddTaskFab onClick={() => setIslandOpen(true)} />
+      </main>
+    </div>
   );
 }
