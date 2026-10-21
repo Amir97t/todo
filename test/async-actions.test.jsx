@@ -10,7 +10,7 @@ import {
 import App from "../src/App.jsx";
 import ThemeProvider from "../src/context/ThemeProvider.jsx";
 import { INBOX_LIST_ID } from "../src/lib/constants.js";
-import { db, lastTaskQuery, reset } from "./fakeApi.js";
+import { db, fakeApi, lastTaskQuery, reset } from "./fakeApi.js";
 
 vi.mock("../src/lib/api.js", async () => {
   const { fakeApi } = await import("./fakeApi.js");
