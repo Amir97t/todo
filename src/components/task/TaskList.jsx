@@ -1,30 +1,33 @@
 import TaskItem from "./TaskItem";
 
 export default function TaskList({
-  title,
   tasks,
   taskActions,
   editingId,
   onStartEdit,
+  isPending,
 }) {
-  return (
-    <section className="mt-10">
-      <h2 className="mb-5 text-2xl font-bold">{title}</h2>
+  if (tasks.length === 0) {
+    return (
+      <section className="mt-6">
+        <p className="text-sm text-(--text-faint)">No tasks.</p>
+      </section>
+    );
+  }
 
-      <div className="space-y-4">
-        {tasks.length === 0 ? (
-          <p className="text-zinc-500">No tasks.</p>
-        ) : (
-          tasks.map((task) => (
-            <TaskItem
-              key={task.id}
-              task={task}
-              taskActions={taskActions}
-              editingId={editingId}
-              onStartEdit={onStartEdit}
-            />
-          ))
-        )}
+  return (
+    <section>
+      <div className="grid grid-cols-1 gap-2 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-5">
+        {tasks.map((task) => (
+          <TaskItem
+            key={task.id}
+            task={task}
+            taskActions={taskActions}
+            editingId={editingId}
+            onStartEdit={onStartEdit}
+            isPending={isPending}
+          />
+        ))}
       </div>
     </section>
   );
