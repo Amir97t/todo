@@ -2,8 +2,15 @@ import { Buffer } from "node:buffer";
 import process from "node:process";
 
 const API_PREFIX = "/api/v1/";
-const ALLOWED_UPSTREAM_HOST =
+const PREVIEW_UPSTREAM_HOST =
   "tasknote-api-git-feat-auth-cors-d68308-amirs-projects-16941eb8.vercel.app";
+const PRODUCTION_UPSTREAM_HOST = "tasknote-api.vercel.app";
+
+function getExpectedUpstreamHost() {
+  return process.env.VERCEL_ENV === "production"
+    ? PRODUCTION_UPSTREAM_HOST
+    : PREVIEW_UPSTREAM_HOST;
+}
 const ALLOWED_METHODS = new Set(["GET", "HEAD", "POST", "PUT", "PATCH", "DELETE"]);
 const REQUEST_HEADER_ALLOWLIST = [
   "accept",
@@ -30,7 +37,7 @@ function sendJson(res, statusCode, payload) {
   res.end(JSON.stringify(payload));
 }
 
-function resolveProxyPath(reqUrl) {
+function resolveProxyPath(reqUrl, upstreamHost) {
   const incomingUrl = new URL(reqUrl || "/", "https://tasknote-proxy.invalid");
   const proxyPath = incomingUrl.searchParams.get("__proxyPath");
 
@@ -49,7 +56,7 @@ function resolveProxyPath(reqUrl) {
     return null;
   }
 
-  const targetUrl = new URL(API_PREFIX + proxyPath, "https://" + ALLOWED_UPSTREAM_HOST);
+  const targetUrl = new URL(API_PREFIX + proxyPath, "https://" + upstreamHost);
 
   for (const [key, value] of incomingUrl.searchParams.entries()) {
     // Vercel can expose the catch-all rewrite capture as "path" alongside
@@ -117,8 +124,13 @@ export default async function handler(req, res) {
 
   const upstreamValue = process.env.TASKNOTE_API_UPSTREAM;
   const bypassSecret = process.env.TASKNOTE_API_BYPASS_SECRET;
+  const expectedHost = getExpectedUpstreamHost();
+  const isProduction = process.env.VERCEL_ENV === "production";
 
-  if (!upstreamValue || !bypassSecret) {
+  // The protected Preview upstream requires a server-only bypass secret.
+  // Production uses the public, canonical API domain; its browser cookie
+  // exchange is proxied same-origin, so no Vercel protection bypass is needed.
+  if (!upstreamValue || (!isProduction && !bypassSecret)) {
     return sendJson(res, 503, {
       code: "API_PROXY_NOT_CONFIGURED",
       message: "The Preview API proxy is not configured.",
@@ -135,14 +147,14 @@ export default async function handler(req, res) {
     });
   }
 
-  if (upstream.protocol !== "https:" || upstream.hostname !== ALLOWED_UPSTREAM_HOST) {
+  if (upstream.protocol !== "https:" || upstream.hostname !== expectedHost) {
     return sendJson(res, 500, {
       code: "API_PROXY_UPSTREAM_NOT_ALLOWED",
       message: "The configured API upstream is not allowed.",
     });
   }
 
-  const targetUrl = resolveProxyPath(req.url);
+  const targetUrl = resolveProxyPath(req.url, expectedHost);
   if (!targetUrl) {
     return sendJson(res, 400, {
       code: "INVALID_API_PATH",
@@ -173,7 +185,7 @@ export default async function handler(req, res) {
 
   // The browser talks to this frontend origin. Preserve Origin for the
   // backend's own allowlist and forward auth/CSRF cookies only server-side.
-  headers.set("x-vercel-protection-bypass", bypassSecret);
+  if (bypassSecret) headers.set("x-vercel-protection-bypass", bypassSecret);
 
   let body;
   if (req.method !== "GET" && req.method !== "HEAD") {
