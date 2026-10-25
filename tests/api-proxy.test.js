@@ -77,6 +77,7 @@ function makeResponse() {
 
 describe("Tasknote Preview API proxy", () => {
   beforeEach(() => {
+    vi.stubEnv("VERCEL_ENV", "preview");
     vi.stubEnv("TASKNOTE_API_UPSTREAM", UPSTREAM);
     vi.stubEnv("TASKNOTE_API_BYPASS_SECRET", "test-only-secret");
     vi.stubGlobal("Headers", TestHeaders);
@@ -217,6 +218,43 @@ describe("Tasknote Preview API proxy", () => {
     );
     expect(options.headers.get("x-csrf-token")).toBe("csrf-safe");
     expect(res.statusCode).toBe(200);
+  });
+
+  it("routes Production through the exact production API host without a Preview bypass secret", async () => {
+    vi.stubEnv("VERCEL_ENV", "production");
+    vi.stubEnv("TASKNOTE_API_UPSTREAM", "https://tasknote-api.vercel.app");
+    vi.stubEnv("TASKNOTE_API_BYPASS_SECRET", "");
+
+    fetch.mockResolvedValue(new Response(JSON.stringify({ status: "ok" }), { status: 200 }));
+
+    const req = makeRequest({
+      url: "/api/proxy?__proxyPath=health",
+      headers: { origin: "https://tasknote-web-xi.vercel.app" },
+    });
+    const res = makeResponse();
+
+    await handler(req, res);
+
+    const [calledUrl, options] = fetch.mock.calls[0];
+    expect(new URL(calledUrl).origin).toBe("https://tasknote-api.vercel.app");
+    expect(new URL(calledUrl).pathname).toBe("/api/v1/health");
+    expect(options.headers.get("x-vercel-protection-bypass")).toBe(null);
+    expect(res.statusCode).toBe(200);
+    expect(JSON.parse(res.body)).toEqual({ status: "ok" });
+  });
+
+  it("rejects a non-canonical upstream for the current Vercel environment", async () => {
+    vi.stubEnv("VERCEL_ENV", "production");
+    vi.stubEnv("TASKNOTE_API_UPSTREAM", UPSTREAM);
+
+    const req = makeRequest({ url: "/api/proxy?__proxyPath=health" });
+    const res = makeResponse();
+
+    await handler(req, res);
+
+    expect(fetch).not.toHaveBeenCalled();
+    expect(res.statusCode).toBe(500);
+    expect(JSON.parse(res.body).code).toBe("API_PROXY_UPSTREAM_NOT_ALLOWED");
   });
 
   it("rejects unsafe paths without sending an upstream request", async () => {

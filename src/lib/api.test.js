@@ -46,6 +46,11 @@ describe("URL construction", () => {
     expect(resolveBaseUrl()).toBe("https://api.example.com");
   });
 
+  it("resolves the same-origin sentinel to the current browser origin", () => {
+    vi.stubEnv("VITE_API_URL", "same-origin");
+    expect(resolveBaseUrl()).toBe(window.location.origin);
+  });
+
   it("strips a trailing slash from VITE_API_URL", () => {
     vi.stubEnv("VITE_API_URL", "https://api.example.com/");
     expect(resolveBaseUrl()).toBe("https://api.example.com");

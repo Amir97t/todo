@@ -27,6 +27,15 @@ export function resolveBaseUrl() {
   const raw = (import.meta.env || {}).VITE_API_URL;
   const trimmed = typeof raw === "string" ? raw.trim() : "";
 
+  // "same-origin" keeps HttpOnly refresh/CSRF cookies first-party in
+  // deployed browsers; the frontend's /api/v1 rewrite securely proxies to
+  // the exact environment-specific backend upstream.
+  if (trimmed.toLowerCase() === "same-origin") {
+    return typeof window !== "undefined" && window.location?.origin
+      ? window.location.origin
+      : DEFAULT_BASE_URL;
+  }
+
   return (trimmed || DEFAULT_BASE_URL).replace(/\/+$/, "");
 }
 
