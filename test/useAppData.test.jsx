@@ -208,6 +208,83 @@ describe("store switch", () => {
     }
   });
 
+  it("toggles checklist items immediately and rolls back on failure", async () => {
+    seedLegacy();
+
+    const { result } = renderHook(() => useAppData());
+    await waitFor(() => expect(result.current.status).toBe("ready"));
+
+    const workId = result.current.lists.find((list) => list.name === "Work").id;
+    expect(
+      await result.current.taskActions.addTask(
+        "Checklist latency",
+        "",
+        [{ text: "Fast item" }],
+        workId,
+      ),
+    ).toBe(true);
+    await waitFor(() =>
+      expect(
+        result.current.tasks.some((task) => task.title === "Checklist latency"),
+      ).toBe(true),
+    );
+
+    const task = result.current.tasks.find((row) => row.title === "Checklist latency");
+    const item = task.checklist[0];
+    const originalUpdate = fakeApi.checklist.update;
+    let releaseUpdate;
+    const updateGate = new Promise((resolve) => {
+      releaseUpdate = resolve;
+    });
+    fakeApi.checklist.update = async (taskId, itemId, body) => {
+      await updateGate;
+      return originalUpdate(taskId, itemId, body);
+    };
+
+    try {
+      let togglePromise;
+      act(() => {
+        togglePromise = result.current.taskActions.toggleChecklistItem(task.id, item.id);
+      });
+
+      // The UI changes before the mocked server permits its PATCH to complete.
+      expect(
+        result.current.tasks.find((row) => row.id === task.id).checklist[0].completed,
+      ).toBe(true);
+      expect(db.tasks.find((row) => row.id === task.id).checklist[0].completed).toBe(false);
+
+      releaseUpdate();
+      expect(await togglePromise).toBe(true);
+      expect(db.tasks.find((row) => row.id === task.id).checklist[0].completed).toBe(true);
+    } finally {
+      releaseUpdate?.();
+      fakeApi.checklist.update = originalUpdate;
+    }
+
+    const failingUpdate = fakeApi.checklist.update;
+    fakeApi.checklist.update = async () => {
+      throw new Error("Simulated checklist request failure");
+    };
+    try {
+      let togglePromise;
+      act(() => {
+        togglePromise = result.current.taskActions.toggleChecklistItem(task.id, item.id);
+      });
+      expect(
+        result.current.tasks.find((row) => row.id === task.id).checklist[0].completed,
+      ).toBe(false);
+      expect(await togglePromise).toBe(false);
+      await waitFor(() =>
+        expect(
+          result.current.tasks.find((row) => row.id === task.id).checklist[0].completed,
+        ).toBe(true),
+      );
+      expect(result.current.actionError).toBeTruthy();
+    } finally {
+      fakeApi.checklist.update = failingUpdate;
+    }
+  });
+
   it("reconciles the destination query when navigating during a pending toggle", async () => {
     seedLegacy();
 
