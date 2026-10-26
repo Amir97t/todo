@@ -207,6 +207,14 @@ export default function useAppData() {
     );
   }, []);
 
+  // Keep the latest published query available to async mutations. If a user
+  // changes pages while a request is in flight, its result must not overwrite
+  // the new page's task list.
+  const taskQueryRef = useRef(taskQuery);
+  useEffect(() => {
+    taskQueryRef.current = taskQuery;
+  }, [taskQuery]);
+
   // The server is the only filter and sorter: whatever it returns is what the
   // page renders. Each run aborts the previous request so a slow older
   // response can never overwrite a newer query's results.
@@ -361,16 +369,93 @@ export default function useAppData() {
     const current = tasks.find((task) => task.id === id);
     if (!current) return false;
 
+    const targetCompleted = !current.completed;
+    const queryAtStart = taskQueryRef.current;
+    const originalTasks = tasks;
+    const originalIndex = originalTasks.findIndex((task) => task.id === id);
+    const leavesCurrentQuery =
+      typeof queryAtStart?.completed === "boolean" &&
+      queryAtStart.completed !== targetCompleted;
+
+    // A completion toggle always moves a task out of the current Active or
+    // Completed query. Remove it immediately instead of waiting for PATCH and
+    // then issuing a second GET just to discover that it no longer matches.
+    // If no completed filter is active, update the row optimistically in place.
+    setTasks((previous) =>
+      leavesCurrentQuery
+        ? previous.filter((task) => task.id !== id)
+        : previous.map((task) =>
+            task.id === id ? { ...task, completed: targetCompleted } : task,
+          ),
+    );
+
     try {
       const updated = await tasksApi.update(id, {
-        completed: !current.completed,
+        completed: targetCompleted,
       });
       setActionError(null);
-      setTasks((prev) => prev.map((task) => (task.id === id ? updated : task)));
-      refreshTasks();
+
+      if (taskQueryRef.current !== queryAtStart) {
+        // The user navigated while PATCH was in flight. The new page may have
+        // fetched before the write committed, so reconcile that new query now.
+        refreshTasks();
+      } else if (!leavesCurrentQuery) {
+        setTasks((previous) =>
+          previous.map((task) => (task.id === id ? updated : task)),
+        );
+      }
+
       return true;
     } catch (cause) {
       setActionError(userMessageFor(cause));
+
+      if (taskQueryRef.current === queryAtStart) {
+        setTasks((previous) => {
+          const existingIndex = previous.findIndex((task) => task.id === id);
+          if (existingIndex >= 0) {
+            return previous.map((task) => (task.id === id ? current : task));
+          }
+
+          // Restore at its previous relative position without discarding other
+          // mutations that may have completed while this request was pending.
+          const nextOriginal = originalTasks
+            .slice(originalIndex + 1)
+            .find((task) => previous.some((row) => row.id === task.id));
+          if (nextOriginal) {
+            const insertAt = previous.findIndex((task) => task.id === nextOriginal.id);
+            return [
+              ...previous.slice(0, insertAt),
+              current,
+              ...previous.slice(insertAt),
+            ];
+          }
+
+          const previousOriginal = originalTasks
+            .slice(0, originalIndex)
+            .reverse()
+            .find((task) => previous.some((row) => row.id === task.id));
+          if (previousOriginal) {
+            const insertAt =
+              previous.findIndex((task) => task.id === previousOriginal.id) + 1;
+            return [
+              ...previous.slice(0, insertAt),
+              current,
+              ...previous.slice(insertAt),
+            ];
+          }
+
+          const insertAt = Math.max(0, Math.min(originalIndex, previous.length));
+          return [
+            ...previous.slice(0, insertAt),
+            current,
+            ...previous.slice(insertAt),
+          ];
+        });
+      }
+
+      // Only the error path pays for a reconciliation fetch. It also handles
+      // the rare case where the server committed but the response was lost.
+      refreshTasks();
       return false;
     }
   }
@@ -488,6 +573,8 @@ export default function useAppData() {
       addTask,
     ),
     deleteTask: guard((id) => mutationKeys.deleteTask(id), deleteTask),
+    // The action reads taskQueryRef only when an event invokes it, not during render.
+    // eslint-disable-next-line react-hooks/refs
     toggleTask: guard((id) => mutationKeys.toggleTask(id), toggleTask),
     editTask: guard((id) => mutationKeys.editTask(id), editTask),
     addChecklistItem: guard(
