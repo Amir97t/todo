@@ -3,7 +3,7 @@ import process from "node:process";
 
 const API_PREFIX = "/api/v1/";
 const PREVIEW_UPSTREAM_HOST =
-  "tasknote-api-git-feat-auth-cors-d68308-amirs-projects-16941eb8.vercel.app";
+  "tasknote-api-git-perf-region-fra-5404ab-amirs-projects-16941eb8.vercel.app";
 const PRODUCTION_UPSTREAM_HOST = "tasknote-api.vercel.app";
 
 function getExpectedUpstreamHost() {
