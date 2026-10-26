@@ -1,8 +1,8 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
-import { renderHook, waitFor } from "@testing-library/react";
+import { act, renderHook, waitFor } from "@testing-library/react";
 import useAppData from "../src/hooks/useAppData.js";
 import { INBOX_LIST_ID } from "../src/lib/constants.js";
-import { db, fakeApi, reset } from "./fakeApi.js";
+import { calls, db, fakeApi, lastTaskQuery, reset } from "./fakeApi.js";
 
 vi.mock("../src/lib/api.js", async () => {
   const { fakeApi: api } = await import("./fakeApi.js");
@@ -139,6 +139,188 @@ describe("store switch", () => {
       expect(result.current.tasks[0].completed).toBe(true),
     );
     expect(db.tasks[0].completed).toBe(true);
+  });
+
+  it("removes a toggled task from the active query before the API responds", async () => {
+    seedLegacy();
+
+    const { result } = renderHook(() => useAppData());
+    await waitFor(() => expect(result.current.status).toBe("ready"));
+
+    const workId = result.current.lists.find((list) => list.name === "Work").id;
+    expect(
+      await result.current.taskActions.addTask("Optimistic toggle", "", [], workId),
+    ).toBe(true);
+    await waitFor(() =>
+      expect(
+        result.current.tasks.some((task) => task.title === "Optimistic toggle"),
+      ).toBe(true),
+    );
+    const created = result.current.tasks.find(
+      (task) => task.title === "Optimistic toggle",
+    );
+
+    act(() => {
+      result.current.setTaskQuery({
+        listId: workId,
+        completed: false,
+        sort: "newest",
+      });
+    });
+    await waitFor(() =>
+      expect(result.current.tasks.map((task) => task.id)).toEqual([created.id]),
+    );
+
+    const readsBeforeToggle = calls.filter((call) => call === "tasks.get").length;
+    const originalUpdate = fakeApi.tasks.update;
+    let releaseUpdate;
+    const updateGate = new Promise((resolve) => {
+      releaseUpdate = resolve;
+    });
+    fakeApi.tasks.update = async (id, body) => {
+      await updateGate;
+      return originalUpdate(id, body);
+    };
+
+    try {
+      let togglePromise;
+      act(() => {
+        togglePromise = result.current.taskActions.toggleTask(created.id);
+      });
+
+      // The task leaves Active immediately, while its server write is still
+      // deliberately blocked.
+      expect(result.current.tasks).toHaveLength(0);
+      expect(calls.filter((call) => call === "tasks.get").length).toBe(
+        readsBeforeToggle,
+      );
+
+      releaseUpdate();
+      expect(await togglePromise).toBe(true);
+      expect(db.tasks.find((task) => task.id === created.id).completed).toBe(true);
+      // A successful toggle must not issue the old redundant follow-up GET.
+      expect(calls.filter((call) => call === "tasks.get").length).toBe(
+        readsBeforeToggle,
+      );
+    } finally {
+      releaseUpdate?.();
+      fakeApi.tasks.update = originalUpdate;
+    }
+  });
+
+  it("reconciles the destination query when navigating during a pending toggle", async () => {
+    seedLegacy();
+
+    const { result } = renderHook(() => useAppData());
+    await waitFor(() => expect(result.current.status).toBe("ready"));
+
+    const workId = result.current.lists.find((list) => list.name === "Work").id;
+    expect(
+      await result.current.taskActions.addTask("Navigate during toggle", "", [], workId),
+    ).toBe(true);
+    await waitFor(() =>
+      expect(
+        result.current.tasks.some((task) => task.title === "Navigate during toggle"),
+      ).toBe(true),
+    );
+    const created = result.current.tasks.find(
+      (task) => task.title === "Navigate during toggle",
+    );
+
+    act(() => {
+      result.current.setTaskQuery({
+        listId: workId,
+        completed: false,
+        sort: "newest",
+      });
+    });
+    await waitFor(() => expect(result.current.tasks.map((task) => task.id)).toEqual([created.id]));
+
+    const originalUpdate = fakeApi.tasks.update;
+    let releaseUpdate;
+    const updateGate = new Promise((resolve) => {
+      releaseUpdate = resolve;
+    });
+    fakeApi.tasks.update = async (id, body) => {
+      await updateGate;
+      return originalUpdate(id, body);
+    };
+
+    try {
+      let togglePromise;
+      act(() => {
+        togglePromise = result.current.taskActions.toggleTask(created.id);
+      });
+      expect(result.current.tasks).toHaveLength(0);
+
+      // Simulate opening Completed before the PATCH commits. Its first GET
+      // correctly returns no row, so success must trigger a reconciliation GET.
+      act(() => {
+        result.current.setTaskQuery({ completed: true, sort: "newest" });
+      });
+      await waitFor(() =>
+        expect(lastTaskQuery.value).toMatchObject({ completed: true }),
+      );
+      expect(db.tasks.find((task) => task.id === created.id).completed).toBe(false);
+
+      releaseUpdate();
+      expect(await togglePromise).toBe(true);
+      await waitFor(() =>
+        expect(result.current.tasks.map((task) => task.id)).toEqual([created.id]),
+      );
+      expect(result.current.tasks[0].completed).toBe(true);
+    } finally {
+      releaseUpdate?.();
+      fakeApi.tasks.update = originalUpdate;
+    }
+  });
+
+  it("restores a task when its optimistic completion update fails", async () => {
+    seedLegacy();
+
+    const { result } = renderHook(() => useAppData());
+    await waitFor(() => expect(result.current.status).toBe("ready"));
+
+    const workId = result.current.lists.find((list) => list.name === "Work").id;
+    expect(
+      await result.current.taskActions.addTask("Failed toggle", "", [], workId),
+    ).toBe(true);
+    await waitFor(() =>
+      expect(result.current.tasks.some((task) => task.title === "Failed toggle")).toBe(true),
+    );
+    const created = result.current.tasks.find((task) => task.title === "Failed toggle");
+
+    act(() => {
+      result.current.setTaskQuery({
+        listId: workId,
+        completed: false,
+        sort: "newest",
+      });
+    });
+    await waitFor(() => expect(result.current.tasks.map((task) => task.id)).toEqual([created.id]));
+
+    const originalUpdate = fakeApi.tasks.update;
+    fakeApi.tasks.update = async () => {
+      throw new Error("Simulated request failure");
+    };
+
+    try {
+      let togglePromise;
+      act(() => {
+        togglePromise = result.current.taskActions.toggleTask(created.id);
+      });
+      expect(result.current.tasks).toHaveLength(0);
+      expect(await togglePromise).toBe(false);
+
+      await waitFor(() =>
+        expect(result.current.tasks.map((task) => task.id)).toEqual([created.id]),
+      );
+      expect(result.current.tasks[0].completed).toBe(false);
+      expect(result.current.actionError).toBeTruthy();
+      expect(db.tasks.find((task) => task.id === created.id).completed).toBe(false);
+    } finally {
+      fakeApi.tasks.update = originalUpdate;
+    }
   });
 
   it("never writes the legacy keys after the switch", async () => {
