@@ -43,16 +43,32 @@ export default function Completed({
   // server query is published after a short pause. Clearing the search
   // updates promptly because the timeout is cleared on value change.
   const debounceRef = useRef(null);
+  const previousSearchRef = useRef(search);
   useEffect(() => {
-    if (debounceRef.current) {
+    if (debounceRef.current !== null) {
       clearTimeout(debounceRef.current);
+      debounceRef.current = null;
     }
-    debounceRef.current = setTimeout(() => {
-      setTaskQuery(buildTaskQuery({ completed: true, q: search, sort: filter }));
-    }, SEARCH_DEBOUNCE_MS);
+
+    const query = buildTaskQuery({ completed: true, q: search, sort: filter });
+    const searchChanged = previousSearchRef.current !== search;
+    previousSearchRef.current = search;
+
+    // Only typing a non-empty search waits for the debounce window. First
+    // load, clearing search and sort changes publish at once.
+    if (searchChanged && search.trim()) {
+      debounceRef.current = setTimeout(() => {
+        debounceRef.current = null;
+        setTaskQuery(query);
+      }, SEARCH_DEBOUNCE_MS);
+    } else {
+      setTaskQuery(query);
+    }
+
     return () => {
-      if (debounceRef.current) {
+      if (debounceRef.current !== null) {
         clearTimeout(debounceRef.current);
+        debounceRef.current = null;
       }
     };
   }, [setTaskQuery, search, filter]);
