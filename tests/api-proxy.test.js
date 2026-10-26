@@ -2,7 +2,7 @@ import { Buffer } from "node:buffer";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import handler from "../api/proxy.js";
 
-const UPSTREAM = "https://tasknote-api-git-feat-auth-cors-d68308-amirs-projects-16941eb8.vercel.app";
+const UPSTREAM = "https://tasknote-api-git-perf-region-fra-5404ab-amirs-projects-16941eb8.vercel.app";
 
 class TestHeaders {
   constructor(initial = {}) {
