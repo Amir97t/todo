@@ -539,7 +539,59 @@ export default function useAppData() {
     const item = task?.checklist?.find((candidate) => candidate.id === itemId);
     if (!item) return false;
 
-    return updateChecklistItem(taskId, itemId, { completed: !item.completed });
+    const completed = !item.completed;
+
+    // Reflect checkbox changes immediately, without waiting for the PATCH.
+    setTasks((previous) =>
+      previous.map((candidate) =>
+        candidate.id === taskId
+          ? {
+              ...candidate,
+              checklist: (candidate.checklist ?? []).map((entry) =>
+                entry.id === itemId ? { ...entry, completed } : entry,
+              ),
+            }
+          : candidate,
+      ),
+    );
+
+    try {
+      const updated = await checklistApi.update(taskId, itemId, { completed });
+      setActionError(null);
+      setTasks((previous) =>
+        previous.map((candidate) =>
+          candidate.id === taskId
+            ? {
+                ...candidate,
+                checklist: (candidate.checklist ?? []).map((entry) =>
+                  entry.id === itemId ? updated : entry,
+                ),
+              }
+            : candidate,
+        ),
+      );
+      return true;
+    } catch (cause) {
+      setActionError(userMessageFor(cause));
+      // Restore only the toggled flag so other checklist edits are preserved.
+      setTasks((previous) =>
+        previous.map((candidate) =>
+          candidate.id === taskId
+            ? {
+                ...candidate,
+                checklist: (candidate.checklist ?? []).map((entry) =>
+                  entry.id === itemId
+                    ? { ...entry, completed: item.completed }
+                    : entry,
+                ),
+              }
+            : candidate,
+        ),
+      );
+      // Reconcile if the server committed but the response was lost.
+      refreshTasks();
+      return false;
+    }
   }
 
   async function deleteChecklistItem(taskId, itemId) {
