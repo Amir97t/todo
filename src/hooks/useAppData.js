@@ -65,6 +65,15 @@ function isSameQuery(previous, next) {
   return true;
 }
 
+/** Produce a stable string key for a query object. */
+export function queryKey(query) {
+  if (!query || typeof query !== "object") return "";
+  const entries = Object.keys(query)
+    .sort()
+    .map((key) => [key, query[key]]);
+  return JSON.stringify(entries);
+}
+
 /**
  * Sole owner of server-owned data. Components receive state and actions from
  * here and never touch fetch, the API client, or the legacy storage keys.
@@ -75,19 +84,59 @@ function isSameQuery(previous, next) {
  * swap, which is the one way this boundary could lose data.
  */
 export default function useAppData() {
-  const [status, setStatus] = useState(() =>
+  const [appStatus, setAppStatus] = useState(() =>
     hasLegacyData() ? "idle" : "loading",
   );
+  const [queryLoading, setQueryLoading] = useState(false);
   const [error, setError] = useState(null);
   const [actionError, setActionError] = useState(null);
   const [lists, setLists] = useState(seedLists);
   const [tasks, setTasks] = useState(seedTasks);
+
   const [retryToken, setRetryToken] = useState(0);
   // Pages publish the query they want; tasks are whatever the server returns
   // for it. null means no page has asked yet, so nothing is fetched.
   const [taskQuery, setTaskQueryState] = useState(null);
   // Bumped by mutations and by retry to re-run the current query.
   const [taskVersion, setTaskVersion] = useState(0);
+
+  // Query-result cache: keyed by queryKey(query), maps to the last server
+  // response for that query. Allows instant display of previously-visited
+  // views while a background revalidation runs.
+  const queryCacheRef = useRef(new Map());
+  // Mutation generation counter to prevent pre-mutation fetches from
+  // repopulating invalidated cache entries with stale data.
+  const mutationGenRef = useRef(0);
+  // Track which query key the displayed tasks correspond to.
+  const [displayedQueryKey, setDisplayedQueryKey] = useState("");
+  const displayedQueryKeyRef = useRef("");
+
+  function updateDisplayedQueryKey(key) {
+    displayedQueryKeyRef.current = key;
+    setDisplayedQueryKey(key);
+  }
+
+  const requestedKey = queryKey(taskQuery);
+  // Reading queryCacheRef during render enables instant display of cached views
+  // (stale-while-revalidate) on the very first render before effects run.
+  // eslint-disable-next-line react-hooks/refs
+  const cachedForRequested = requestedKey ? queryCacheRef.current.get(requestedKey) : undefined;
+
+  const displayedTasks =
+    taskQuery === null
+      ? tasks
+      : cachedForRequested !== undefined
+        ? cachedForRequested
+        : displayedQueryKey === requestedKey
+          ? tasks
+          : [];
+
+  // tasksRef always points to the latest tasks array so async callbacks in
+  // toggleChecklistItem can read current item state without stale closures.
+  const tasksRef = useRef(displayedTasks);
+  useEffect(() => {
+    tasksRef.current = displayedTasks;
+  });
 
   // Keyed in-flight guard. A second submission of the same operation joins
   // the first promise rather than issuing a second request, so a double-click
@@ -96,6 +145,12 @@ export default function useAppData() {
   // `finally` so a failure never wedges the action.
   const [pending, setPending] = useState(() => new Set());
   const pendingRef = useRef(new Map());
+
+  // Per-item toggle state for serialized rapid toggles.
+  // Maps itemKey → { desired: boolean, confirmed: boolean, inflight: boolean }
+  const toggleStateRef = useRef(new Map());
+  const togglePromisesRef = useRef(new Map());
+  const editPromisesRef = useRef(new Map());
 
   const isPending = (key) => pending.has(key);
 
@@ -153,14 +208,14 @@ export default function useAppData() {
   }, [storedSelected, lists]);
 
   const userId = getAccessTokenSubject();
-  const ready = status === "ready";
+  const ready = appStatus === "ready";
 
   useEffect(() => {
     let cancelled = false;
 
     (async () => {
       // "idle" keeps the legacy rows on screen; anything else shows loading.
-      setStatus((prev) => (prev === "idle" ? "idle" : "loading"));
+      setAppStatus((prev) => (prev === "idle" ? "idle" : "loading"));
       setError(null);
 
       try {
@@ -183,11 +238,11 @@ export default function useAppData() {
         });
 
         setLists(serverLists);
-        setStatus("ready");
+        setAppStatus("ready");
       } catch (cause) {
         if (cancelled) return;
         setError(messageOf(cause));
-        setStatus("error");
+        setAppStatus("error");
       }
     })();
 
@@ -210,20 +265,65 @@ export default function useAppData() {
   // The server is the only filter and sorter: whatever it returns is what the
   // page renders. Each run aborts the previous request so a slow older
   // response can never overwrite a newer query's results.
+  //
+  // Query-result cache: when a previously-visited query is requested again,
+  // display its cached results immediately and revalidate in the background.
   useEffect(() => {
-    if (status !== "ready" || taskQuery === null) return undefined;
+    if (!ready || taskQuery === null) return undefined;
+
+    const key = queryKey(taskQuery);
+    const cached = queryCacheRef.current.get(key);
+
+    if (cached) {
+      // Show stale-while-revalidate: display the cached result immediately.
+      setTasks(cached);
+      updateDisplayedQueryKey(key);
+      setQueryLoading(false);
+    } else if (displayedQueryKeyRef.current === key) {
+      // Revalidating the currently displayed query in the background:
+      // keep existing tasks visible and do not show full-page loading.
+      setQueryLoading(false);
+    } else {
+      setQueryLoading(true);
+    }
 
     const controller = new AbortController();
     let stale = false;
+    const fetchGen = mutationGenRef.current;
 
     (async () => {
       try {
         const rows = await tasksApi.get(taskQuery, controller.signal);
         if (stale) return;
-        setTasks(rows);
+        // If a mutation occurred while this fetch was in flight, rows are obsolete.
+        if (fetchGen !== mutationGenRef.current) return;
+
+        // Reconcile with active in-flight optimistic toggles if any.
+        const reconciledRows = rows.map((task) => {
+          if (!task.checklist?.length) return task;
+          return {
+            ...task,
+            checklist: task.checklist.map((item) => {
+              const activeToggle = toggleStateRef.current.get(
+                `${task.id}:${item.id}`,
+              );
+              return activeToggle
+                ? { ...item, completed: activeToggle.desired }
+                : item;
+            }),
+          };
+        });
+
+        // Update cache and display the fresh result.
+        queryCacheRef.current.set(key, reconciledRows);
+        setTasks(reconciledRows);
+        updateDisplayedQueryKey(key);
+        setQueryLoading(false);
         setError(null);
       } catch (cause) {
         if (stale || cause?.code === "ABORTED") return;
+        setQueryLoading(false);
+        updateDisplayedQueryKey(key);
         setError(messageOf(cause));
       }
     })();
@@ -232,7 +332,7 @@ export default function useAppData() {
       stale = true;
       controller.abort();
     };
-  }, [status, taskQuery, taskVersion]);
+  }, [ready, taskQuery, taskVersion]);
 
   function retry() {
     setActionError(null);
@@ -247,7 +347,10 @@ export default function useAppData() {
   // A mutation can move a task out of the active query (toggling completed,
   // changing list, deleting a list's tasks). With client-side filtering gone
   // the rendered array must come back from the server to stay truthful.
+  // Also invalidates any cached query results that may be affected.
   function refreshTasks() {
+    queryCacheRef.current.clear();
+    mutationGenRef.current += 1;
     setTaskVersion((version) => version + 1);
   }
 
@@ -358,7 +461,7 @@ export default function useAppData() {
 
   async function toggleTask(id) {
     if (!ready) return refuse("update a task")();
-    const current = tasks.find((task) => task.id === id);
+    const current = tasksRef.current.find((task) => task.id === id);
     if (!current) return false;
 
     try {
@@ -377,7 +480,7 @@ export default function useAppData() {
 
   async function editTask(id, updatedTask) {
     if (!ready) return refuse("edit a task")();
-    if (!tasks.some((task) => task.id === id)) return false;
+    if (!tasksRef.current.some((task) => task.id === id)) return false;
 
     const body = {};
     if (updatedTask.title !== undefined) body.title = updatedTask.title;
@@ -416,6 +519,7 @@ export default function useAppData() {
             : task,
         ),
       );
+      refreshTasks();
       return true;
     } catch (cause) {
       setActionError(userMessageFor(cause));
@@ -426,86 +530,244 @@ export default function useAppData() {
   async function updateChecklistItem(taskId, itemId, patch) {
     if (!ready) return refuse("update a checklist item")();
 
-    try {
-      const updated = await checklistApi.update(taskId, itemId, patch);
-      setActionError(null);
-      setTasks((prev) =>
-        prev.map((task) =>
-          task.id === taskId
-            ? {
-                ...task,
-                checklist: (task.checklist ?? []).map((item) =>
-                  item.id === itemId ? updated : item,
-                ),
-              }
-            : task,
-        ),
-      );
-      return true;
-    } catch (cause) {
-      setActionError(userMessageFor(cause));
-      return false;
+    const itemKey = `${taskId}:${itemId}`;
+    // If a toggle is currently in flight for this item, wait for it to settle
+    // so edits and toggles do not race concurrently against the backend.
+    const inFlightToggle = togglePromisesRef.current.get(itemKey);
+    if (inFlightToggle) {
+      try {
+        await inFlightToggle;
+      } catch {
+        /* ignore toggle failure in edit flow */
+      }
     }
+
+    const runEdit = async () => {
+      try {
+        const updated = await checklistApi.update(taskId, itemId, patch);
+        setActionError(null);
+        setTasks((prev) =>
+          prev.map((task) =>
+            task.id === taskId
+              ? {
+                  ...task,
+                  checklist: (task.checklist ?? []).map((item) => {
+                    if (item.id !== itemId) return item;
+                    const activeToggle = toggleStateRef.current.get(itemKey);
+                    return activeToggle
+                      ? { ...updated, completed: activeToggle.desired }
+                      : updated;
+                  }),
+                }
+              : task,
+          ),
+        );
+        refreshTasks();
+        return true;
+      } catch (cause) {
+        setActionError(userMessageFor(cause));
+        return false;
+      } finally {
+        if (editPromisesRef.current.get(itemKey) === editPromise) {
+          editPromisesRef.current.delete(itemKey);
+        }
+      }
+    };
+
+    const editPromise = runEdit();
+    editPromisesRef.current.set(itemKey, editPromise);
+    return await editPromise;
   }
 
+  /**
+   * Serialized rapid-toggle implementation.
+   *
+   * Every click must:
+   *   1. Flip the visible checkbox immediately (optimistic).
+   *   2. Not send concurrent conflicting PATCH requests for the same item.
+   *   3. Track the latest desired state while a request is running.
+   *   4. When the inflight request settles, send a follow-up PATCH only if the
+   *      persisted server state still differs from the latest desired state.
+   *   5. On failure, restore the last confirmed server state and release all
+   *      pending state — never leave the item stuck.
+   *   6. Keep independent checklist items fully independent.
+   *
+   * State per item (stored in toggleStateRef):
+   *   { desired: boolean, confirmed: boolean, inflight: boolean }
+   *
+   * tasksRef.current is always the latest task array, so we never read a stale
+   * closure value when multiple toggles race across React state batches.
+   */
   async function toggleChecklistItem(taskId, itemId) {
     if (!ready) return refuse("update a checklist item")();
-    const task = tasks.find((candidate) => candidate.id === taskId);
-    const item = task?.checklist?.find((candidate) => candidate.id === itemId);
-    if (!item) return false;
 
-    const previousCompleted = item.completed;
+    const itemKey = `${taskId}:${itemId}`;
+    const ts = toggleStateRef.current;
 
-    // Optimistic update: flip the item immediately so the checkbox, strike-
-    // through and progress bar respond without waiting for the network.
+    // Determine the current visible (optimistic) state of the item.
+    // If we have toggle state tracking this item, desired is the authoritative
+    // current intent; otherwise look at the live task state from the ref.
+    const currentState = ts.get(itemKey);
+
+    let currentCompleted;
+    if (currentState) {
+      currentCompleted = currentState.desired;
+    } else {
+      const task = tasksRef.current.find((candidate) => candidate.id === taskId);
+      const item = task?.checklist?.find((candidate) => candidate.id === itemId);
+      if (!item) return false;
+      currentCompleted = item.completed;
+    }
+
+    const newDesired = !currentCompleted;
+
+    // Optimistically flip the visible state immediately.
     setTasks((prev) =>
       prev.map((t) =>
         t.id === taskId
           ? {
               ...t,
               checklist: (t.checklist ?? []).map((c) =>
-                c.id === itemId ? { ...c, completed: !previousCompleted } : c,
+                c.id === itemId ? { ...c, completed: newDesired } : c,
               ),
             }
           : t,
       ),
     );
 
-    try {
-      const updated = await checklistApi.update(taskId, itemId, {
-        completed: !previousCompleted,
-      });
-      setActionError(null);
-      // Reconcile with the server response.
-      setTasks((prev) =>
-        prev.map((t) =>
-          t.id === taskId
-            ? {
-                ...t,
-                checklist: (t.checklist ?? []).map((c) =>
-                  c.id === itemId ? updated : c,
-                ),
-              }
-            : t,
-        ),
-      );
+    if (currentState?.inflight) {
+      // A request is already running — update desired intent and let the
+      // inflight request's finally-block handle the follow-up.
+      ts.set(itemKey, { ...currentState, desired: newDesired });
       return true;
-    } catch (cause) {
-      // Rollback: restore only this item's previous completion state.
-      setTasks((prev) =>
-        prev.map((t) =>
-          t.id === taskId
-            ? {
-                ...t,
-                checklist: (t.checklist ?? []).map((c) =>
-                  c.id === itemId ? { ...c, completed: previousCompleted } : c,
-                ),
-              }
-            : t,
-        ),
-      );
-      setActionError(userMessageFor(cause));
-      return false;
+    }
+
+    // No inflight request: determine confirmed baseline.
+    const task = tasksRef.current.find((candidate) => candidate.id === taskId);
+    const item = task?.checklist?.find((candidate) => candidate.id === itemId);
+    const confirmedCompleted =
+      currentState?.confirmed ?? item?.completed ?? currentCompleted;
+
+    // Start tracking this item.
+    ts.set(itemKey, {
+      desired: newDesired,
+      confirmed: confirmedCompleted,
+      inflight: true,
+    });
+
+    // Run the serialized request loop: keep sending PATCHes until the server
+    // state matches the latest desired state, or until a failure occurs.
+    const loopPromise = (async () => {
+      let succeeded = true;
+      while (true) {
+        const state = ts.get(itemKey);
+        if (!state || state.desired === state.confirmed) break;
+
+        // If a text edit is in flight for this item, wait for it to settle
+        // before issuing the completion update to avoid conflicting requests.
+        const inFlightEdit = editPromisesRef.current.get(itemKey);
+        if (inFlightEdit) {
+          try {
+            await inFlightEdit;
+          } catch {
+            /* ignore edit failure in toggle flow */
+          }
+        }
+
+        const latestState = ts.get(itemKey);
+        if (!latestState || latestState.desired === latestState.confirmed) {
+          break;
+        }
+
+        const targetCompleted = latestState.desired;
+
+        try {
+          const updated = await checklistApi.update(taskId, itemId, {
+            completed: targetCompleted,
+          });
+          setActionError(null);
+
+          const latest = ts.get(itemKey);
+          if (!latest) break; // state was cleared by a failure
+
+          // Update confirmed to what the server accepted.
+          ts.set(itemKey, { ...latest, confirmed: updated.completed });
+
+          // Reconcile with the actual server response for this specific item
+          // only if the latest desired intent hasn't superseded it.
+          if (latest.desired === updated.completed) {
+            setTasks((prev) =>
+              prev.map((t) =>
+                t.id === taskId
+                  ? {
+                      ...t,
+                      checklist: (t.checklist ?? []).map((c) => {
+                        if (c.id !== itemId) return c;
+                        return {
+                          ...updated,
+                          text: c.text ?? updated.text,
+                        };
+                      }),
+                    }
+                  : t,
+              ),
+            );
+          }
+        } catch (cause) {
+          // Restore to last confirmed server state for this item only.
+          const latest = ts.get(itemKey);
+          const restoreCompleted = latest?.confirmed ?? confirmedCompleted;
+
+          setTasks((prev) =>
+            prev.map((t) =>
+              t.id === taskId
+                ? {
+                    ...t,
+                    checklist: (t.checklist ?? []).map((c) =>
+                      c.id === itemId
+                        ? { ...c, completed: restoreCompleted }
+                        : c,
+                    ),
+                  }
+                : t,
+            ),
+          );
+          setActionError(userMessageFor(cause));
+          ts.delete(itemKey);
+          succeeded = false;
+          break;
+        }
+
+        // After the await, check again: if desired changed while we were awaiting
+        // the PATCH, the while loop will issue a follow-up PATCH.
+        const latest = ts.get(itemKey);
+        if (!latest || latest.desired === latest.confirmed) break;
+      }
+
+      // Release the inflight flag and clean up if desired === confirmed.
+      const finalState = ts.get(itemKey);
+      if (finalState) {
+        if (finalState.desired === finalState.confirmed) {
+          ts.delete(itemKey);
+        } else {
+          ts.set(itemKey, { ...finalState, inflight: false });
+        }
+      }
+
+      if (succeeded) {
+        refreshTasks();
+      }
+
+      return succeeded;
+    })();
+
+    togglePromisesRef.current.set(itemKey, loopPromise);
+    try {
+      return await loopPromise;
+    } finally {
+      if (togglePromisesRef.current.get(itemKey) === loopPromise) {
+        togglePromisesRef.current.delete(itemKey);
+      }
     }
   }
 
@@ -527,6 +789,7 @@ export default function useAppData() {
             : task,
         ),
       );
+      refreshTasks();
       return true;
     } catch (cause) {
       setActionError(userMessageFor(cause));
@@ -534,6 +797,7 @@ export default function useAppData() {
     }
   }
 
+  /* eslint-disable react-hooks/refs */
   const taskActions = {
     addTask: guard(
       (title, description, checklist, listId) => mutationKeys.createTask(listId),
@@ -554,23 +818,23 @@ export default function useAppData() {
       (taskId, itemId) => mutationKeys.deleteChecklistItem(taskId, itemId),
       deleteChecklistItem,
     ),
-    // Shares the update key because both are one patch of this item. The
-    // inner call runs against the raw function, so it cannot await itself.
-    toggleChecklistItem: guard(
-      (taskId, itemId) => mutationKeys.updateChecklistItem(taskId, itemId),
-      toggleChecklistItem,
-    ),
+    // toggleChecklistItem is NOT wrapped with the global guard — it has its
+    // own per-item serialized state machine that handles rapid clicks correctly.
+    toggleChecklistItem,
   };
 
+  const publicStatus =
+    appStatus === "ready" && queryLoading ? "loading" : appStatus;
+
   return {
-    status,
+    status: publicStatus,
     error,
     actionError,
     clearActionError,
     isPending,
     retry,
     lists,
-    tasks,
+    tasks: displayedTasks,
     taskQuery,
     setTaskQuery,
     taskActions,

@@ -1,17 +1,13 @@
 import { defineConfig } from "vite";
+import react from "@vitejs/plugin-react";
+import tailwindcss from "@tailwindcss/vite";
+import { configDefaults } from "vitest/config";
 
 export default defineConfig({
+  plugins: [react(), tailwindcss()],
   test: {
-    // Use the same jsdom environment as the main config.
     environment: "jsdom",
-    // Reuse the existing test setup utilities.
     setupFiles: ["./test/setup.js"],
-    // Exclude the live‑migration integration test which requires the global
-    // backend setup (database, server, etc.). All other test files are safe to
-    // run in this fast, database‑free mode.
-    exclude: ["**/live-migration.test.js"],
-
-    // Disable any globalSetup that would start the live backend.
-    globalSetup: [],
+    exclude: [...configDefaults.exclude, "**/live-migration.test.js"],
   },
 });
