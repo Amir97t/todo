@@ -38,16 +38,23 @@ export default function Inbox({
   const [search, setSearch] = useState("");
   const [filter, setFilter] = useState("newest");
 
-  // Debounced search query to reduce request volume while keeping the input
-  // immediately responsive. The local state updates on every keystroke; the
-  // server query is published after a short pause. Clearing the search
-  // updates promptly because the timeout is cleared on value change.
+  // Publish the query immediately when non-search parameters change (list,
+  // sort/filter). Only the search text is debounced to reduce request volume
+  // while typing; clearing the search also publishes immediately.
   const debounceRef = useRef(null);
+  const prevNonSearchRef = useRef({ selectedListId, filter });
+
   useEffect(() => {
+    const nonSearchChanged =
+      prevNonSearchRef.current.selectedListId !== selectedListId ||
+      prevNonSearchRef.current.filter !== filter;
+    prevNonSearchRef.current = { selectedListId, filter };
+
     if (debounceRef.current) {
       clearTimeout(debounceRef.current);
     }
-    debounceRef.current = setTimeout(() => {
+
+    const publish = () =>
       setTaskQuery(
         buildTaskQuery({
           listId: selectedListId,
@@ -56,7 +63,14 @@ export default function Inbox({
           sort: filter,
         }),
       );
-    }, SEARCH_DEBOUNCE_MS);
+
+    // Publish immediately for non-search changes or when search is cleared.
+    if (nonSearchChanged || search === "") {
+      publish();
+    } else {
+      debounceRef.current = setTimeout(publish, SEARCH_DEBOUNCE_MS);
+    }
+
     return () => {
       if (debounceRef.current) {
         clearTimeout(debounceRef.current);
