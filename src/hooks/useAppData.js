@@ -454,7 +454,59 @@ export default function useAppData() {
     const item = task?.checklist?.find((candidate) => candidate.id === itemId);
     if (!item) return false;
 
-    return updateChecklistItem(taskId, itemId, { completed: !item.completed });
+    const previousCompleted = item.completed;
+
+    // Optimistic update: flip the item immediately so the checkbox, strike-
+    // through and progress bar respond without waiting for the network.
+    setTasks((prev) =>
+      prev.map((t) =>
+        t.id === taskId
+          ? {
+              ...t,
+              checklist: (t.checklist ?? []).map((c) =>
+                c.id === itemId ? { ...c, completed: !previousCompleted } : c,
+              ),
+            }
+          : t,
+      ),
+    );
+
+    try {
+      const updated = await checklistApi.update(taskId, itemId, {
+        completed: !previousCompleted,
+      });
+      setActionError(null);
+      // Reconcile with the server response.
+      setTasks((prev) =>
+        prev.map((t) =>
+          t.id === taskId
+            ? {
+                ...t,
+                checklist: (t.checklist ?? []).map((c) =>
+                  c.id === itemId ? updated : c,
+                ),
+              }
+            : t,
+        ),
+      );
+      return true;
+    } catch (cause) {
+      // Rollback: restore only this item's previous completion state.
+      setTasks((prev) =>
+        prev.map((t) =>
+          t.id === taskId
+            ? {
+                ...t,
+                checklist: (t.checklist ?? []).map((c) =>
+                  c.id === itemId ? { ...c, completed: previousCompleted } : c,
+                ),
+              }
+            : t,
+        ),
+      );
+      setActionError(userMessageFor(cause));
+      return false;
+    }
   }
 
   async function deleteChecklistItem(taskId, itemId) {
