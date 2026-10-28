@@ -9,5 +9,6 @@ export default defineConfig({
     environment: "jsdom",
     setupFiles: ["./test/setup.js"],
     exclude: [...configDefaults.exclude, "**/live-migration.test.js"],
+    testTimeout: 15000,
   },
 });

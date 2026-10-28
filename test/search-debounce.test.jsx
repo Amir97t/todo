@@ -106,6 +106,7 @@ describe("search debounce behavior (0ms in test mode)", () => {
 
   it("changing filter/sort fires immediately", async () => {
     await boot();
+    await waitForQuery({ listId: workId() });
 
     const initialGetCalls = calls.filter((c) => c === "tasks.get").length;
 
