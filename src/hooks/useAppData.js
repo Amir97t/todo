@@ -74,6 +74,121 @@ export function queryKey(query) {
   return JSON.stringify(entries);
 }
 
+/** Parse a queryKey back into a query object, or null if invalid. */
+export function parseQueryKey(key) {
+  try {
+    if (!key) return null;
+    const entries = JSON.parse(key);
+    if (!Array.isArray(entries)) return null;
+    return Object.fromEntries(entries);
+  } catch {
+    return null;
+  }
+}
+
+export function parseTimestamp(val) {
+  if (typeof val === "number") {
+    return Number.isFinite(val) ? val : null;
+  }
+  if (typeof val === "string") {
+    const trimmed = val.trim();
+    if (!trimmed) return null;
+    const parsed = Date.parse(trimmed);
+    return Number.isNaN(parsed) ? null : parsed;
+  }
+  return null;
+}
+
+export function compareIds(aId, bId) {
+  if (aId === bId) return 0;
+  if (aId === null || aId === undefined || bId === null || bId === undefined) {
+    return null;
+  }
+  if (typeof aId === "number" && typeof bId === "number") {
+    if (!Number.isFinite(aId) || !Number.isFinite(bId)) return null;
+    return aId < bId ? -1 : 1;
+  }
+  if (typeof aId !== "string" && typeof aId !== "number") return null;
+  if (typeof bId !== "string" && typeof bId !== "number") return null;
+
+  const aStr = String(aId).trim();
+  const bStr = String(bId).trim();
+  if (!aStr || !bStr) return null;
+  if (aStr === bStr) return 0;
+  return aStr < bStr ? -1 : 1;
+}
+
+export function compareNewestOrder(a, b) {
+  const aTime = parseTimestamp(a?.createdAt);
+  const bTime = parseTimestamp(b?.createdAt);
+  if (aTime === null || bTime === null) return null;
+
+  if (aTime !== bTime) {
+    return aTime > bTime ? 1 : -1;
+  }
+
+  const idComp = compareIds(a?.id, b?.id);
+  if (idComp === null) return null;
+  return idComp;
+}
+
+/**
+ * Inserts a task into a newest-first sorted task list at its exact chronological
+ * position based on createdAt DESC, then id DESC tie-breaker, matching the backend contract.
+ * Updates in-place if the task already exists, preserving existing position.
+ * Returns null if timestamp or id cannot be compared reliably, signalling cache invalidation.
+ */
+export function insertOrUpdateNewest(list, task) {
+  if (!Array.isArray(list) || !task || typeof task !== "object") return null;
+
+  // 1. If task already exists in list, update it in place, preserving existing position and avoiding duplicates.
+  const existingIndex = list.findIndex((t) => t.id === task.id);
+  if (existingIndex !== -1) {
+    const result = [];
+    let placed = false;
+    for (let i = 0; i < list.length; i++) {
+      if (list[i].id === task.id) {
+        if (!placed) {
+          result.push(task);
+          placed = true;
+        }
+      } else {
+        result.push(list[i]);
+      }
+    }
+    return result;
+  }
+
+  // 2. Validate that the new task has a reliable timestamp and identifier.
+  const taskTime = parseTimestamp(task.createdAt);
+  const taskIdValid =
+    task.id !== null && task.id !== undefined && String(task.id).trim() !== "";
+  if (taskTime === null || !taskIdValid) {
+    return null;
+  }
+
+  if (!list.length) return [task];
+
+  // 3. Find insertion index matching newest sort (createdAt DESC, then id DESC).
+  let insertIndex = -1;
+  for (let i = 0; i < list.length; i++) {
+    const comp = compareNewestOrder(task, list[i]);
+    if (comp === null) {
+      // Unreliable comparison with an element in list
+      return null;
+    }
+    if (comp > 0) {
+      insertIndex = i;
+      break;
+    }
+  }
+
+  if (insertIndex === -1) {
+    return [...list, task];
+  }
+  return [...list.slice(0, insertIndex), task, ...list.slice(insertIndex)];
+}
+
 /**
  * Sole owner of server-owned data. Components receive state and actions from
  * here and never touch fetch, the API client, or the legacy storage keys.
@@ -125,14 +240,14 @@ export default function useAppData() {
   const displayedTasks =
     taskQuery === null
       ? tasks
-      : cachedForRequested !== undefined
-        ? cachedForRequested
-        : displayedQueryKey === requestedKey
-          ? tasks
+      : displayedQueryKey === requestedKey
+        ? tasks
+        : cachedForRequested !== undefined
+          ? cachedForRequested
           : [];
 
   // tasksRef always points to the latest tasks array so async callbacks in
-  // toggleChecklistItem can read current item state without stale closures.
+  // toggleChecklistItem and toggleTask can read current item state without stale closures.
   const tasksRef = useRef(displayedTasks);
   useEffect(() => {
     tasksRef.current = displayedTasks;
@@ -145,6 +260,11 @@ export default function useAppData() {
   // `finally` so a failure never wedges the action.
   const [pending, setPending] = useState(() => new Set());
   const pendingRef = useRef(new Map());
+
+  // Per-task toggle state for serialized rapid toggles.
+  // Maps taskId → { desired: boolean, confirmed: boolean, inflight: boolean }
+  const taskToggleStateRef = useRef(new Map());
+  const taskTogglePromisesRef = useRef(new Map());
 
   // Per-item toggle state for serialized rapid toggles.
   // Maps itemKey → { desired: boolean, confirmed: boolean, inflight: boolean }
@@ -274,16 +394,18 @@ export default function useAppData() {
     const key = queryKey(taskQuery);
     const cached = queryCacheRef.current.get(key);
 
-    if (cached) {
-      // Show stale-while-revalidate: display the cached result immediately.
+    if (displayedQueryKeyRef.current === key) {
+      // Revalidating the currently displayed query in the background:
+      // keep existing live tasks visible (preserving optimistic updates)
+      // and do not show full-page loading.
+      setQueryLoading(false);
+    } else if (cached) {
+      // Switching to a previously-cached query: display the cached result immediately.
       setTasks(cached);
       updateDisplayedQueryKey(key);
       setQueryLoading(false);
-    } else if (displayedQueryKeyRef.current === key) {
-      // Revalidating the currently displayed query in the background:
-      // keep existing tasks visible and do not show full-page loading.
-      setQueryLoading(false);
     } else {
+      // Switching to an uncached query: show loading state.
       setQueryLoading(true);
     }
 
@@ -300,10 +422,18 @@ export default function useAppData() {
 
         // Reconcile with active in-flight optimistic toggles if any.
         const reconciledRows = rows.map((task) => {
-          if (!task.checklist?.length) return task;
+          let currentTask = task;
+          const activeTaskToggle = taskToggleStateRef.current.get(task.id);
+          if (activeTaskToggle) {
+            currentTask = {
+              ...currentTask,
+              completed: activeTaskToggle.desired,
+            };
+          }
+          if (!currentTask.checklist?.length) return currentTask;
           return {
-            ...task,
-            checklist: task.checklist.map((item) => {
+            ...currentTask,
+            checklist: currentTask.checklist.map((item) => {
               const activeToggle = toggleStateRef.current.get(
                 `${task.id}:${item.id}`,
               );
@@ -344,14 +474,232 @@ export default function useAppData() {
     setActionError(null);
   }
 
-  // A mutation can move a task out of the active query (toggling completed,
-  // changing list, deleting a list's tasks). With client-side filtering gone
-  // the rendered array must come back from the server to stay truthful.
-  // Also invalidates any cached query results that may be affected.
+  // A mutation increments mutationGenRef and bumps taskVersion to re-run the
+  // current query against the server in the background without clearing warm caches.
   function refreshTasks() {
-    queryCacheRef.current.clear();
     mutationGenRef.current += 1;
     setTaskVersion((version) => version + 1);
+  }
+
+  function removeTaskFromAllCaches(taskId) {
+    for (const [key, cachedList] of queryCacheRef.current.entries()) {
+      if (cachedList.some((task) => task.id === taskId)) {
+        queryCacheRef.current.set(
+          key,
+          cachedList.filter((task) => task.id !== taskId),
+        );
+      }
+    }
+  }
+
+  function updateTaskInAllCaches(taskId, updater) {
+    for (const [key, cachedList] of queryCacheRef.current.entries()) {
+      if (cachedList.some((task) => task.id === taskId)) {
+        queryCacheRef.current.set(
+          key,
+          cachedList.map((task) => (task.id === taskId ? updater(task) : task)),
+        );
+      }
+    }
+  }
+
+  function reconcileTaskCompletion(updatedTask) {
+    const isCompleted = updatedTask.completed;
+
+    for (const [key, cachedList] of queryCacheRef.current.entries()) {
+      const parsed = parseQueryKey(key);
+      if (!parsed) {
+        queryCacheRef.current.delete(key);
+        continue;
+      }
+
+      const isSearch = Boolean(parsed.q && String(parsed.q).trim());
+      const isDefaultSort = !parsed.sort || parsed.sort === "newest";
+
+      // 1. If the cached query explicitly filters for the opposite completion state,
+      // it is always safe to remove the task from that cache.
+      if (parsed.completed === false && isCompleted) {
+        queryCacheRef.current.set(
+          key,
+          cachedList.filter((t) => t.id !== updatedTask.id),
+        );
+        continue;
+      }
+
+      if (parsed.completed === true && !isCompleted) {
+        queryCacheRef.current.set(
+          key,
+          cachedList.filter((t) => t.id !== updatedTask.id),
+        );
+        continue;
+      }
+
+      // 2. The task matches the completion filter of this query (or query does not filter on completed).
+      // If this query is a search query:
+      // We cannot determine server search membership without running the query on the server.
+      // - If the task was already in the search cache: update it in place.
+      // - If the task was NOT in the search cache: NEVER insert it! Evict the search cache so
+      //   returning to it will fetch fresh authoritative results.
+      if (isSearch) {
+        const exists = cachedList.some((t) => t.id === updatedTask.id);
+        if (exists) {
+          queryCacheRef.current.set(
+            key,
+            cachedList.map((t) => (t.id === updatedTask.id ? updatedTask : t)),
+          );
+        } else {
+          queryCacheRef.current.delete(key);
+        }
+        continue;
+      }
+
+      // 3. If this query has a non-default sort (e.g. oldest),
+      // we cannot establish exact insertion position without server sorting.
+      // Evict non-default sorted cache entries when a task would need to be newly inserted.
+      if (!isDefaultSort) {
+        const exists = cachedList.some((t) => t.id === updatedTask.id);
+        if (exists) {
+          queryCacheRef.current.set(
+            key,
+            cachedList.map((t) => (t.id === updatedTask.id ? updatedTask : t)),
+          );
+        } else {
+          queryCacheRef.current.delete(key);
+        }
+        continue;
+      }
+
+      // 4. Default sorted view (sort === 'newest' or unset) without search.
+      // For active queries: verify list scoping matches.
+      if (parsed.completed === false) {
+        if (parsed.listId && parsed.listId !== updatedTask.listId) {
+          queryCacheRef.current.set(
+            key,
+            cachedList.filter((t) => t.id !== updatedTask.id),
+          );
+        } else {
+          const nextList = insertOrUpdateNewest(cachedList, updatedTask);
+          if (nextList === null) {
+            queryCacheRef.current.delete(key);
+          } else {
+            queryCacheRef.current.set(key, nextList);
+          }
+        }
+        continue;
+      }
+
+      // For completed queries: Completed view is global across lists.
+      if (parsed.completed === true) {
+        const nextList = insertOrUpdateNewest(cachedList, updatedTask);
+        if (nextList === null) {
+          queryCacheRef.current.delete(key);
+        } else {
+          queryCacheRef.current.set(key, nextList);
+        }
+        continue;
+      }
+
+      // Query without completed filter (all tasks)
+      if (parsed.listId && parsed.listId !== updatedTask.listId) {
+        queryCacheRef.current.set(
+          key,
+          cachedList.filter((t) => t.id !== updatedTask.id),
+        );
+      } else {
+        const nextList = insertOrUpdateNewest(cachedList, updatedTask);
+        if (nextList === null) {
+          queryCacheRef.current.delete(key);
+        } else {
+          queryCacheRef.current.set(key, nextList);
+        }
+      }
+    }
+
+    if (displayedQueryKeyRef.current) {
+      const updatedForCurrent = queryCacheRef.current.get(
+        displayedQueryKeyRef.current,
+      );
+      if (updatedForCurrent) {
+        setTasks(updatedForCurrent);
+      }
+    }
+
+    refreshTasks();
+  }
+
+  function reconcileTaskMove(id, updated) {
+    const targetListId = updated.listId;
+
+    for (const [key, cachedList] of queryCacheRef.current.entries()) {
+      const parsed = parseQueryKey(key);
+      if (!parsed) {
+        queryCacheRef.current.delete(key);
+        continue;
+      }
+
+      if (parsed.listId) {
+        if (parsed.listId !== targetListId) {
+          // Task was moved out of this list: remove it immediately.
+          queryCacheRef.current.set(
+            key,
+            cachedList.filter((t) => t.id !== id),
+          );
+        } else {
+          // Destination list:
+          if (parsed.completed !== undefined && parsed.completed !== updated.completed) {
+            queryCacheRef.current.set(
+              key,
+              cachedList.filter((t) => t.id !== id),
+            );
+            continue;
+          }
+          const isSearch = Boolean(parsed.q && String(parsed.q).trim());
+          const isDefaultSort = !parsed.sort || parsed.sort === "newest";
+          if (isSearch || !isDefaultSort) {
+            queryCacheRef.current.delete(key);
+          } else {
+            const nextList = insertOrUpdateNewest(cachedList, updated);
+            if (nextList === null) {
+              queryCacheRef.current.delete(key);
+            } else {
+              queryCacheRef.current.set(key, nextList);
+            }
+          }
+        }
+      } else {
+        // Global view (like Completed)
+        if (parsed.completed !== undefined && parsed.completed !== updated.completed) {
+          queryCacheRef.current.set(
+            key,
+            cachedList.filter((t) => t.id !== id),
+          );
+          continue;
+        }
+        const isSearch = Boolean(parsed.q && String(parsed.q).trim());
+        const isDefaultSort = !parsed.sort || parsed.sort === "newest";
+        if (isSearch || !isDefaultSort) {
+          queryCacheRef.current.delete(key);
+        } else {
+          const nextList = insertOrUpdateNewest(cachedList, updated);
+          if (nextList === null) {
+            queryCacheRef.current.delete(key);
+          } else {
+            queryCacheRef.current.set(key, nextList);
+          }
+        }
+      }
+    }
+
+    if (displayedQueryKeyRef.current) {
+      const updatedForCurrent = queryCacheRef.current.get(
+        displayedQueryKeyRef.current,
+      );
+      if (updatedForCurrent) {
+        setTasks(updatedForCurrent);
+      }
+    }
+
+    refreshTasks();
   }
 
   function refuse(action) {
@@ -410,6 +758,30 @@ export default function useAppData() {
       setActionError(null);
       setLists((prev) => prev.filter((list) => list.id !== id));
       if (selectedListId === id) setStoredSelected(INBOX_LIST_ID);
+
+      for (const [key, cachedList] of queryCacheRef.current.entries()) {
+        try {
+          const params = Object.fromEntries(JSON.parse(key));
+          if (params.listId === id) {
+            queryCacheRef.current.delete(key);
+          } else if (deleteTasks) {
+            queryCacheRef.current.set(
+              key,
+              cachedList.filter((task) => task.listId !== id),
+            );
+          } else {
+            queryCacheRef.current.set(
+              key,
+              cachedList.map((task) =>
+                task.listId === id ? { ...task, listId: INBOX_LIST_ID } : task,
+              ),
+            );
+          }
+        } catch {
+          queryCacheRef.current.delete(key);
+        }
+      }
+
       refreshTasks();
       return true;
     } catch (cause) {
@@ -435,7 +807,57 @@ export default function useAppData() {
         })),
       });
       setActionError(null);
-      setTasks((prev) => [...prev, created]);
+
+      for (const [key, cachedList] of queryCacheRef.current.entries()) {
+        const parsed = parseQueryKey(key);
+        if (!parsed) {
+          queryCacheRef.current.delete(key);
+          continue;
+        }
+        if (parsed.q) {
+          queryCacheRef.current.delete(key);
+          continue;
+        }
+        const isDefaultSort = !parsed.sort || parsed.sort === "newest";
+        if (!isDefaultSort) {
+          queryCacheRef.current.delete(key);
+          continue;
+        }
+        if (parsed.completed === true) {
+          // New task is active, so it does not belong in completed cache
+          continue;
+        }
+        if (parsed.listId && parsed.listId !== listId) {
+          // Scoped to a different list
+          continue;
+        }
+        const nextList = insertOrUpdateNewest(cachedList, created);
+        if (nextList === null) {
+          queryCacheRef.current.delete(key);
+        } else {
+          queryCacheRef.current.set(key, nextList);
+        }
+      }
+
+      if (displayedQueryKeyRef.current) {
+        const updatedForCurrent = queryCacheRef.current.get(
+          displayedQueryKeyRef.current,
+        );
+        if (updatedForCurrent) {
+          setTasks(updatedForCurrent);
+        } else {
+          setTasks((prev) => {
+            const next = insertOrUpdateNewest(prev, created);
+            return next !== null ? next : prev;
+          });
+        }
+      } else {
+        setTasks((prev) => {
+          const next = insertOrUpdateNewest(prev, created);
+          return next !== null ? next : prev;
+        });
+      }
+
       refreshTasks();
       return true;
     } catch (cause) {
@@ -451,6 +873,7 @@ export default function useAppData() {
       await tasksApi.remove(id);
       setActionError(null);
       setTasks((prev) => prev.filter((task) => task.id !== id));
+      removeTaskFromAllCaches(id);
       refreshTasks();
       return true;
     } catch (cause) {
@@ -461,20 +884,140 @@ export default function useAppData() {
 
   async function toggleTask(id) {
     if (!ready) return refuse("update a task")();
-    const current = tasksRef.current.find((task) => task.id === id);
-    if (!current) return false;
 
-    try {
-      const updated = await tasksApi.update(id, {
-        completed: !current.completed,
-      });
-      setActionError(null);
-      setTasks((prev) => prev.map((task) => (task.id === id ? updated : task)));
-      refreshTasks();
+    const ts = taskToggleStateRef.current;
+    const currentState = ts.get(id);
+
+    let currentCompleted;
+    if (currentState) {
+      currentCompleted = currentState.desired;
+    } else {
+      const task =
+        displayedTasks.find((candidate) => candidate.id === id) ??
+        tasksRef.current.find((candidate) => candidate.id === id) ??
+        tasks.find((candidate) => candidate.id === id);
+      if (!task) return false;
+      currentCompleted = task.completed;
+    }
+
+    const newDesired = !currentCompleted;
+
+    // Optimistically update the visible state immediately.
+    setTasks((prev) =>
+      prev.map((t) => (t.id === id ? { ...t, completed: newDesired } : t)),
+    );
+
+    if (displayedQueryKeyRef.current) {
+      const curCached = queryCacheRef.current.get(displayedQueryKeyRef.current);
+      if (curCached) {
+        queryCacheRef.current.set(
+          displayedQueryKeyRef.current,
+          curCached.map((t) =>
+            t.id === id ? { ...t, completed: newDesired } : t,
+          ),
+        );
+      }
+    }
+
+    if (currentState?.inflight) {
+      ts.set(id, { ...currentState, desired: newDesired });
       return true;
-    } catch (cause) {
-      setActionError(userMessageFor(cause));
-      return false;
+    }
+
+    const task =
+      displayedTasks.find((candidate) => candidate.id === id) ??
+      tasksRef.current.find((candidate) => candidate.id === id);
+    const confirmedCompleted =
+      currentState?.confirmed ?? task?.completed ?? currentCompleted;
+
+    ts.set(id, {
+      desired: newDesired,
+      confirmed: confirmedCompleted,
+      inflight: true,
+    });
+
+    const loopPromise = (async () => {
+      let succeeded = true;
+      let lastUpdatedTask = null;
+
+      while (true) {
+        const state = ts.get(id);
+        if (!state || state.desired === state.confirmed) break;
+
+        const targetCompleted = state.desired;
+
+        try {
+          const updated = await tasksApi.update(id, {
+            completed: targetCompleted,
+          });
+          setActionError(null);
+          lastUpdatedTask = updated;
+
+          const latest = ts.get(id);
+          if (!latest) break;
+
+          ts.set(id, { ...latest, confirmed: updated.completed });
+
+          if (latest.desired === updated.completed) {
+            setTasks((prev) =>
+              prev.map((t) => (t.id === id ? { ...t, ...updated } : t)),
+            );
+          }
+        } catch (cause) {
+          const latest = ts.get(id);
+          const restoreCompleted = latest?.confirmed ?? confirmedCompleted;
+
+          setTasks((prev) =>
+            prev.map((t) =>
+              t.id === id ? { ...t, completed: restoreCompleted } : t,
+            ),
+          );
+          if (displayedQueryKeyRef.current) {
+            const curCached = queryCacheRef.current.get(
+              displayedQueryKeyRef.current,
+            );
+            if (curCached) {
+              queryCacheRef.current.set(
+                displayedQueryKeyRef.current,
+                curCached.map((t) =>
+                  t.id === id ? { ...t, completed: restoreCompleted } : t,
+                ),
+              );
+            }
+          }
+          setActionError(userMessageFor(cause));
+          ts.delete(id);
+          succeeded = false;
+          break;
+        }
+
+        const latest = ts.get(id);
+        if (!latest || latest.desired === latest.confirmed) break;
+      }
+
+      const finalState = ts.get(id);
+      if (finalState) {
+        if (finalState.desired === finalState.confirmed) {
+          ts.delete(id);
+        } else {
+          ts.set(id, { ...finalState, inflight: false });
+        }
+      }
+
+      if (succeeded && lastUpdatedTask) {
+        reconcileTaskCompletion(lastUpdatedTask);
+      }
+
+      return succeeded;
+    })();
+
+    taskTogglePromisesRef.current.set(id, loopPromise);
+    try {
+      return await loopPromise;
+    } finally {
+      if (taskTogglePromisesRef.current.get(id) === loopPromise) {
+        taskTogglePromisesRef.current.delete(id);
+      }
     }
   }
 
@@ -495,8 +1038,25 @@ export default function useAppData() {
     try {
       const updated = await tasksApi.update(id, body);
       setActionError(null);
-      setTasks((prev) => prev.map((task) => (task.id === id ? updated : task)));
-      refreshTasks();
+      if (body.completed !== undefined) {
+        reconcileTaskCompletion(updated);
+      } else if (body.listId !== undefined) {
+        reconcileTaskMove(id, updated);
+      } else {
+        setTasks((prev) =>
+          prev.map((task) => (task.id === id ? updated : task)),
+        );
+        if (body.title !== undefined || body.description !== undefined) {
+          for (const [key] of queryCacheRef.current.entries()) {
+            const parsed = parseQueryKey(key);
+            if (parsed?.q) {
+              queryCacheRef.current.delete(key);
+            }
+          }
+        }
+        updateTaskInAllCaches(id, (task) => ({ ...task, ...updated }));
+        refreshTasks();
+      }
       return true;
     } catch (cause) {
       setActionError(userMessageFor(cause));
@@ -519,6 +1079,10 @@ export default function useAppData() {
             : task,
         ),
       );
+      updateTaskInAllCaches(taskId, (t) => ({
+        ...t,
+        checklist: [...(t.checklist ?? []), created],
+      }));
       refreshTasks();
       return true;
     } catch (cause) {
@@ -562,6 +1126,14 @@ export default function useAppData() {
               : task,
           ),
         );
+        updateTaskInAllCaches(taskId, (t) => ({
+          ...t,
+          checklist: (t.checklist ?? []).map((item) =>
+            item.id === itemId
+              ? { ...updated, completed: item.completed }
+              : item,
+          ),
+        }));
         refreshTasks();
         return true;
       } catch (cause) {
@@ -634,6 +1206,12 @@ export default function useAppData() {
           : t,
       ),
     );
+    updateTaskInAllCaches(taskId, (t) => ({
+      ...t,
+      checklist: (t.checklist ?? []).map((c) =>
+        c.id === itemId ? { ...c, completed: newDesired } : c,
+      ),
+    }));
 
     if (currentState?.inflight) {
       // A request is already running — update desired intent and let the
@@ -643,7 +1221,9 @@ export default function useAppData() {
     }
 
     // No inflight request: determine confirmed baseline.
-    const task = tasksRef.current.find((candidate) => candidate.id === taskId);
+    const task =
+      displayedTasks.find((candidate) => candidate.id === taskId) ??
+      tasksRef.current.find((candidate) => candidate.id === taskId);
     const item = task?.checklist?.find((candidate) => candidate.id === itemId);
     const confirmedCompleted =
       currentState?.confirmed ?? item?.completed ?? currentCompleted;
@@ -732,6 +1312,12 @@ export default function useAppData() {
                 : t,
             ),
           );
+          updateTaskInAllCaches(taskId, (t) => ({
+            ...t,
+            checklist: (t.checklist ?? []).map((c) =>
+              c.id === itemId ? { ...c, completed: restoreCompleted } : c,
+            ),
+          }));
           setActionError(userMessageFor(cause));
           ts.delete(itemKey);
           succeeded = false;
@@ -789,6 +1375,10 @@ export default function useAppData() {
             : task,
         ),
       );
+      updateTaskInAllCaches(taskId, (t) => ({
+        ...t,
+        checklist: (t.checklist ?? []).filter((item) => item.id !== itemId),
+      }));
       refreshTasks();
       return true;
     } catch (cause) {
@@ -804,7 +1394,9 @@ export default function useAppData() {
       addTask,
     ),
     deleteTask: guard((id) => mutationKeys.deleteTask(id), deleteTask),
-    toggleTask: guard((id) => mutationKeys.toggleTask(id), toggleTask),
+    // toggleTask is NOT wrapped with the global guard — it has its own per-task
+    // serialized state machine that handles rapid clicks correctly.
+    toggleTask,
     editTask: guard((id) => mutationKeys.editTask(id), editTask),
     addChecklistItem: guard(
       (taskId) => mutationKeys.createChecklistItem(taskId),
