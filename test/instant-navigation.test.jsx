@@ -708,12 +708,12 @@ describe("Instant navigation and query responsiveness", () => {
 });
 
 describe("Task completion toggle — optimistic and serialized", () => {
-  it("immediately updates task checkbox and styling before API resolution", async () => {
+  it("Test A — Complete an Active task: disappears from Active, appears in warm Completed before PATCH resolves", async () => {
     seed({
       taskRows: [
         {
           id: "t-1",
-          title: "Optimistic Task",
+          title: "Active Task 1",
           description: "",
           completed: false,
           listId: "l1",
@@ -725,8 +725,16 @@ describe("Task completion toggle — optimistic and serialized", () => {
     });
 
     await boot();
-    await waitFor(() => expect(screen.getByText("Optimistic Task")).toBeTruthy());
+    // 1. Load the Active view and warm the Completed query cache
+    await waitFor(() => expect(screen.getByText("Active Task 1")).toBeTruthy());
 
+    fireEvent.click(screen.getByRole("link", { name: "Completed tasks" }));
+    await waitFor(() => expect(screen.getByText("No completed tasks")).toBeTruthy());
+
+    fireEvent.click(screen.getByRole("link", { name: "Active tasks" }));
+    await waitFor(() => expect(screen.getByText("Active Task 1")).toBeTruthy());
+
+    // 2. Intercept and delay the task update request
     const originalUpdate = fakeApi.tasks.update;
     const gate = deferred();
     let updateCalled = false;
@@ -738,153 +746,136 @@ describe("Task completion toggle — optimistic and serialized", () => {
     };
 
     try {
+      // 3. Click a task's completion checkbox
       const checkbox = screen.getByRole("checkbox", {
-        name: 'Mark "Optimistic Task" as completed',
+        name: 'Mark "Active Task 1" as completed',
       });
-      expect(checkbox.checked).toBe(false);
-
       fireEvent.click(checkbox);
 
-      // Immediately checked and struck-through before API resolves
-      expect(checkbox.checked).toBe(true);
-      const title = screen.getByText("Optimistic Task");
-      expect(title.style.textDecoration).toBe("line-through");
-
+      // 4. Before resolving the PATCH, verify the task disappears from the rendered Active list
+      expect(screen.queryByText("Active Task 1")).toBeNull();
       await waitFor(() => expect(updateCalled).toBe(true));
 
-      // Resolve API
+      // 5. Switch to Completed while the PATCH is still pending
+      fireEvent.click(screen.getByRole("link", { name: "Completed tasks" }));
+
+      // 6. Verify the task is already present exactly once in the warm Completed view
+      await waitFor(() => expect(screen.getByText("Active Task 1")).toBeTruthy());
+      const allMatches = screen.getAllByText("Active Task 1");
+      expect(allMatches).toHaveLength(1);
+      const completedCheckbox = screen.getByRole("checkbox", {
+        name: 'Mark "Active Task 1" as active',
+      });
+      expect(completedCheckbox.checked).toBe(true);
+
+      // 7. Resolve the PATCH and verify the final result remains correct
       gate.resolve();
-
-      // Once confirmed and active query revalidates, task moves out of active view
-      await waitFor(() => {
-        expect(screen.queryByText("Optimistic Task")).toBeNull();
-      });
-      expect(db.tasks[0].completed).toBe(true);
-    } finally {
-      fakeApi.tasks.update = originalUpdate;
-    }
-  });
-
-  it("handles two rapid clicks during one delayed request without dropping intent", async () => {
-    seed({
-      taskRows: [
-        {
-          id: "t-1",
-          title: "Rapid Task",
-          description: "",
-          completed: false,
-          listId: "l1",
-          createdAt: 1700000000000,
-          checklist: [],
-        },
-      ],
-      selectedList: "l1",
-    });
-
-    await boot();
-    await waitFor(() => expect(screen.getByText("Rapid Task")).toBeTruthy());
-
-    const originalUpdate = fakeApi.tasks.update;
-    const gate1 = deferred();
-    let callCount = 0;
-
-    fakeApi.tasks.update = async (id, body) => {
-      callCount++;
-      if (callCount === 1) {
-        await gate1.promise;
-      }
-      return originalUpdate(id, body);
-    };
-
-    try {
-      const checkbox = screen.getByRole("checkbox", {
-        name: 'Mark "Rapid Task" as completed',
-      });
-
-      // Click 1 (check)
-      fireEvent.click(checkbox);
-      expect(checkbox.checked).toBe(true);
-
-      // Click 2 (uncheck) while request 1 is still in flight
-      fireEvent.click(checkbox);
-      expect(checkbox.checked).toBe(false);
-
-      // Release request 1
-      gate1.resolve();
-
-      // Serialized queue issues request 2 to set completed: false
-      await waitFor(() => expect(callCount).toBe(2));
-      await waitFor(() => expect(db.tasks[0].completed).toBe(false));
-
-      // Task remains in active view as uncompleted
-      expect(screen.getByText("Rapid Task")).toBeTruthy();
-      expect(checkbox.checked).toBe(false);
-    } finally {
-      fakeApi.tasks.update = originalUpdate;
-    }
-  });
-
-  it("handles three rapid clicks during one delayed request: final state matches three clicks (completed)", async () => {
-    seed({
-      taskRows: [
-        {
-          id: "t-1",
-          title: "Three Click Task",
-          description: "",
-          completed: false,
-          listId: "l1",
-          createdAt: 1700000000000,
-          checklist: [],
-        },
-      ],
-      selectedList: "l1",
-    });
-
-    await boot();
-    await waitFor(() => expect(screen.getByText("Three Click Task")).toBeTruthy());
-
-    const originalUpdate = fakeApi.tasks.update;
-    const gate1 = deferred();
-    let callCount = 0;
-
-    fakeApi.tasks.update = async (id, body) => {
-      callCount++;
-      if (callCount === 1) {
-        await gate1.promise;
-      }
-      return originalUpdate(id, body);
-    };
-
-    try {
-      const checkbox = screen.getByRole("checkbox", {
-        name: 'Mark "Three Click Task" as completed',
-      });
-
-      // Click 1 (check)
-      fireEvent.click(checkbox);
-      expect(checkbox.checked).toBe(true);
-
-      // Click 2 (uncheck)
-      fireEvent.click(checkbox);
-      expect(checkbox.checked).toBe(false);
-
-      // Click 3 (check)
-      fireEvent.click(checkbox);
-      expect(checkbox.checked).toBe(true);
-
-      // Release request 1
-      gate1.resolve();
-
-      // Final desired state matches confirmed state (true)
       await waitFor(() => expect(db.tasks[0].completed).toBe(true));
-      await waitFor(() => expect(screen.queryByText("Three Click Task")).toBeNull());
+      expect(screen.getByText("Active Task 1")).toBeTruthy();
+    } finally {
+      fakeApi.tasks.update = originalUpdate;
+    }
+  });
+
+  it("Test B — Uncomplete a Completed task: disappears from Completed, appears in warm Active in correct position before PATCH resolves", async () => {
+    seed({
+      taskRows: [
+        {
+          id: "t-newer",
+          title: "Active Newer",
+          description: "",
+          completed: false,
+          listId: "l1",
+          createdAt: 1700000003000,
+          checklist: [],
+        },
+        {
+          id: "t-middle",
+          title: "Completed Middle",
+          description: "",
+          completed: true,
+          listId: "l1",
+          createdAt: 1700000002000,
+          checklist: [],
+        },
+        {
+          id: "t-older",
+          title: "Active Older",
+          description: "",
+          completed: false,
+          listId: "l1",
+          createdAt: 1700000001000,
+          checklist: [],
+        },
+      ],
+      selectedList: "l1",
+    });
+
+    await boot();
+    // 1. Load and warm both Active and Completed views
+    await waitFor(() => expect(screen.getByText("Active Newer")).toBeTruthy());
+    expect(screen.getByText("Active Older")).toBeTruthy();
+    expect(screen.queryByText("Completed Middle")).toBeNull();
+
+    fireEvent.click(screen.getByRole("link", { name: "Completed tasks" }));
+    await waitFor(() => expect(screen.getByText("Completed Middle")).toBeTruthy());
+    expect(screen.queryByText("Active Newer")).toBeNull();
+    expect(screen.queryByText("Active Older")).toBeNull();
+
+    // 2. Delay the update request
+    const originalUpdate = fakeApi.tasks.update;
+    const gate = deferred();
+    let updateCalled = false;
+
+    fakeApi.tasks.update = async (...args) => {
+      updateCalled = true;
+      await gate.promise;
+      return originalUpdate(...args);
+    };
+
+    try {
+      // 3. Uncomplete a task in Completed
+      const checkbox = screen.getByRole("checkbox", {
+        name: 'Mark "Completed Middle" as active',
+      });
+      fireEvent.click(checkbox);
+
+      // 4. Verify it immediately disappears from Completed
+      expect(screen.queryByText("Completed Middle")).toBeNull();
+      await waitFor(() => expect(updateCalled).toBe(true));
+
+      // 5. Switch to Active before the request resolves
+      fireEvent.click(screen.getByRole("link", { name: "Active tasks" }));
+
+      // 6. Verify it appears in the correct chronological position without duplication
+      await waitFor(() => expect(screen.getByText("Completed Middle")).toBeTruthy());
+      expect(screen.getAllByText("Completed Middle")).toHaveLength(1);
+
+      const renderedTasks = screen.getAllByRole("heading", { level: 3 });
+      const titles = renderedTasks.map((el) => el.textContent.trim());
+      expect(titles).toEqual(["Active Newer", "Completed Middle", "Active Older"]);
+
+      // 7. Resolve the request and verify it remains correctly placed
+      gate.resolve();
+      await waitFor(() => {
+        expect(
+          db.tasks.find((t) => t.title === "Completed Middle")?.completed,
+        ).toBe(false);
+      });
+
+      const finalRendered = screen.getAllByRole("heading", { level: 3 });
+      expect(finalRendered.map((el) => el.textContent.trim())).toEqual([
+        "Active Newer",
+        "Completed Middle",
+        "Active Older",
+      ]);
     } finally {
       fakeApi.tasks.update = originalUpdate;
     }
   });
 
   it(
-    "rolls back to confirmed state on API failure and succeeds on subsequent retry",
+    "Test C — Failure rollback: task moves optimistically, request fails, task returns to source view and error shown",
     async () => {
       seed({
         taskRows: [
@@ -902,6 +893,12 @@ describe("Task completion toggle — optimistic and serialized", () => {
       });
 
       await boot();
+      await waitFor(() => expect(screen.getByText("Fail Task")).toBeTruthy());
+
+      // Warm Completed query cache
+      fireEvent.click(screen.getByRole("link", { name: "Completed tasks" }));
+      await waitFor(() => expect(screen.getByText("No completed tasks")).toBeTruthy());
+      fireEvent.click(screen.getByRole("link", { name: "Active tasks" }));
       await waitFor(() => expect(screen.getByText("Fail Task")).toBeTruthy());
 
       const originalUpdate = fakeApi.tasks.update;
@@ -924,29 +921,189 @@ describe("Task completion toggle — optimistic and serialized", () => {
           name: 'Mark "Fail Task" as completed',
         });
 
+        // 1 & 2: Start task toggle, delay API response, verify task moves optimistically
         fireEvent.click(checkbox);
-        // Optimistic check while request is in flight
-        expect(checkbox.checked).toBe(true);
+        expect(screen.queryByText("Fail Task")).toBeNull();
 
-        // Trigger failure
+        // Switch to Completed to verify optimistic presence
+        fireEvent.click(screen.getByRole("link", { name: "Completed tasks" }));
+        expect(screen.getByText("Fail Task")).toBeTruthy();
+
+        // 3 & 4: Reject the request, verify task returns to source view and disappears from target view
         failGate.resolve();
 
-        // Rollback on failure
-        await waitFor(() => expect(checkbox.checked).toBe(false));
-        expect(screen.getByText("Fail Task")).toBeTruthy();
+        // After failure, task disappears from Completed view
+        await waitFor(() => {
+          expect(screen.queryByText("Fail Task")).toBeNull();
+        });
+
+        // Switch to Active view: task is restored in source view
+        fireEvent.click(screen.getByRole("link", { name: "Active tasks" }));
+        await waitFor(() => expect(screen.getByText("Fail Task")).toBeTruthy());
         expect(db.tasks[0].completed).toBe(false);
 
-        // Subsequent retry succeeds
-        fireEvent.click(checkbox);
-        await waitFor(() => expect(db.tasks[0].completed).toBe(true), {
-          timeout: 10000,
+        // Verify action error alert is displayed
+        expect(screen.getByRole("alert")).toBeTruthy();
+
+        // 5: Verify a subsequent toggle can succeed
+        const restoredCheckbox = screen.getByRole("checkbox", {
+          name: 'Mark "Fail Task" as completed',
         });
+        fireEvent.click(restoredCheckbox);
+        expect(screen.queryByText("Fail Task")).toBeNull();
+
+        await waitFor(() => expect(db.tasks[0].completed).toBe(true));
       } finally {
         fakeApi.tasks.update = originalUpdate;
       }
     },
-    15000
+    15000,
   );
+
+  it("Test D — Rapid clicks and stale fetches: 2 and 3 rapid clicks produce correct final persisted state and membership", async () => {
+    seed({
+      taskRows: [
+        {
+          id: "t-1",
+          title: "Rapid Task",
+          description: "",
+          completed: false,
+          listId: "l1",
+          createdAt: 1700000000000,
+          checklist: [],
+        },
+      ],
+      selectedList: "l1",
+    });
+
+    await boot();
+    await waitFor(() => expect(screen.getByText("Rapid Task")).toBeTruthy());
+
+    // Warm Completed view
+    fireEvent.click(screen.getByRole("link", { name: "Completed tasks" }));
+    await waitFor(() => expect(screen.getByText("No completed tasks")).toBeTruthy());
+    fireEvent.click(screen.getByRole("link", { name: "Active tasks" }));
+    await waitFor(() => expect(screen.getByText("Rapid Task")).toBeTruthy());
+
+    const originalUpdate = fakeApi.tasks.update;
+    const originalGet = fakeApi.tasks.get;
+    const gate1 = deferred();
+    let updateCalls = 0;
+
+    fakeApi.tasks.update = async (id, body) => {
+      updateCalls++;
+      if (updateCalls === 1) {
+        await gate1.promise;
+      }
+      return originalUpdate(id, body);
+    };
+
+    // Stale fetch gate: a query fetch that returns obsolete task placement
+    const staleGetGate = deferred();
+    let getCalls = 0;
+    fakeApi.tasks.get = async (query, signal) => {
+      getCalls++;
+      if (getCalls === 4) {
+        await staleGetGate.promise;
+      }
+      return originalGet(query, signal);
+    };
+
+    try {
+      // --- PART 1: Two rapid clicks (Active -> Completed -> Active) ---
+      // Click 1 in Active view (moves to Completed)
+      const checkboxActive = screen.getByRole("checkbox", {
+        name: 'Mark "Rapid Task" as completed',
+      });
+      fireEvent.click(checkboxActive);
+      expect(screen.queryByText("Rapid Task")).toBeNull();
+
+      // Switch to Completed
+      fireEvent.click(screen.getByRole("link", { name: "Completed tasks" }));
+      expect(screen.getByText("Rapid Task")).toBeTruthy();
+
+      // Click 2 in Completed view while request 1 is still in flight (moves back to Active)
+      const checkboxCompleted = screen.getByRole("checkbox", {
+        name: 'Mark "Rapid Task" as active',
+      });
+      fireEvent.click(checkboxCompleted);
+      expect(screen.queryByText("Rapid Task")).toBeNull();
+
+      // Release delayed/stale GET query
+      staleGetGate.resolve();
+
+      // Release request 1
+      gate1.resolve();
+
+      // Serialized queue processes request 2 (completed: false)
+      await waitFor(() => expect(updateCalls).toBe(2));
+      await waitFor(() => expect(db.tasks[0].completed).toBe(false));
+
+      // Task is restored in Active view, not present in Completed view
+      expect(screen.queryByText("Rapid Task")).toBeNull();
+      fireEvent.click(screen.getByRole("link", { name: "Active tasks" }));
+      await waitFor(() => expect(screen.getByText("Rapid Task")).toBeTruthy());
+      const activeCheckboxAfter2 = screen.getByRole("checkbox", {
+        name: 'Mark "Rapid Task" as completed',
+      });
+      expect(activeCheckboxAfter2.checked).toBe(false);
+
+      // --- PART 2: Three rapid clicks (Active -> Completed -> Active -> Completed) ---
+      const gate2 = deferred();
+      let part2UpdateCalls = 0;
+      fakeApi.tasks.update = async (id, body) => {
+        part2UpdateCalls++;
+        if (part2UpdateCalls === 1) {
+          await gate2.promise;
+        }
+        return originalUpdate(id, body);
+      };
+
+      // Click 1 (Active -> Completed)
+      fireEvent.click(activeCheckboxAfter2);
+      expect(screen.queryByText("Rapid Task")).toBeNull();
+
+      // Switch to Completed
+      fireEvent.click(screen.getByRole("link", { name: "Completed tasks" }));
+      expect(screen.getByText("Rapid Task")).toBeTruthy();
+
+      // Click 2 (Completed -> Active)
+      const checkboxCompleted2 = screen.getByRole("checkbox", {
+        name: 'Mark "Rapid Task" as active',
+      });
+      fireEvent.click(checkboxCompleted2);
+      expect(screen.queryByText("Rapid Task")).toBeNull();
+
+      // Switch to Active
+      fireEvent.click(screen.getByRole("link", { name: "Active tasks" }));
+      expect(screen.getByText("Rapid Task")).toBeTruthy();
+
+      // Click 3 (Active -> Completed)
+      const checkboxActive3 = screen.getByRole("checkbox", {
+        name: 'Mark "Rapid Task" as completed',
+      });
+      fireEvent.click(checkboxActive3);
+      expect(screen.queryByText("Rapid Task")).toBeNull();
+
+      // Release first in-flight request of part 2
+      gate2.resolve();
+
+      // Wait for all updates to settle to final desired state: completed = true
+      await waitFor(() => expect(db.tasks[0].completed).toBe(true));
+
+      // Final membership: NOT in Active view, present in Completed view
+      expect(screen.queryByText("Rapid Task")).toBeNull();
+      fireEvent.click(screen.getByRole("link", { name: "Completed tasks" }));
+      await waitFor(() => expect(screen.getByText("Rapid Task")).toBeTruthy());
+      const finalCheckbox = screen.getByRole("checkbox", {
+        name: 'Mark "Rapid Task" as active',
+      });
+      expect(finalCheckbox.checked).toBe(true);
+    } finally {
+      fakeApi.tasks.update = originalUpdate;
+      fakeApi.tasks.get = originalGet;
+    }
+  });
 
   it("a task-status response does not overwrite a newer desired state", async () => {
     seed({
@@ -967,6 +1124,12 @@ describe("Task completion toggle — optimistic and serialized", () => {
     await boot();
     await waitFor(() => expect(screen.getByText("Stale Task")).toBeTruthy());
 
+    // Warm completed view
+    fireEvent.click(screen.getByRole("link", { name: "Completed tasks" }));
+    await waitFor(() => expect(screen.getByText("No completed tasks")).toBeTruthy());
+    fireEvent.click(screen.getByRole("link", { name: "Active tasks" }));
+    await waitFor(() => expect(screen.getByText("Stale Task")).toBeTruthy());
+
     const originalUpdate = fakeApi.tasks.update;
     const gate = deferred();
     let callCount = 0;
@@ -985,16 +1148,29 @@ describe("Task completion toggle — optimistic and serialized", () => {
         name: 'Mark "Stale Task" as completed',
       });
 
-      // User checks then immediately unchecks
+      // User checks (moves to Completed)
       fireEvent.click(checkbox);
-      fireEvent.click(checkbox);
-      expect(checkbox.checked).toBe(false);
+      expect(screen.queryByText("Stale Task")).toBeNull();
+
+      // In Completed, user unchecks (moves back to Active)
+      fireEvent.click(screen.getByRole("link", { name: "Completed tasks" }));
+      const completedCheckbox = screen.getByRole("checkbox", {
+        name: 'Mark "Stale Task" as active',
+      });
+      fireEvent.click(completedCheckbox);
+      expect(screen.queryByText("Stale Task")).toBeNull();
 
       // Release server response that says completed: true
       gate.resolve();
 
-      // Checkbox must NOT be forced back to true by stale response
-      await waitFor(() => expect(checkbox.checked).toBe(false));
+      // Switch to Active: task must remain active and unchecked, not forced back to completed
+      fireEvent.click(screen.getByRole("link", { name: "Active tasks" }));
+      await waitFor(() => {
+        const activeCb = screen.getByRole("checkbox", {
+          name: 'Mark "Stale Task" as completed',
+        });
+        expect(activeCb.checked).toBe(false);
+      });
     } finally {
       fakeApi.tasks.update = originalUpdate;
     }

@@ -418,10 +418,18 @@ export default function useAppData() {
         const rows = await tasksApi.get(taskQuery, controller.signal);
         if (stale) return;
         // If a mutation occurred while this fetch was in flight, rows are obsolete.
-        if (fetchGen !== mutationGenRef.current) return;
+        if (fetchGen !== mutationGenRef.current) {
+          if (queryCacheRef.current.has(key)) {
+            setTasks(queryCacheRef.current.get(key));
+          }
+          setQueryLoading(false);
+          return;
+        }
+
+        const parsed = parseQueryKey(key);
 
         // Reconcile with active in-flight optimistic toggles if any.
-        const reconciledRows = rows.map((task) => {
+        let reconciledRows = rows.map((task) => {
           let currentTask = task;
           const activeTaskToggle = taskToggleStateRef.current.get(task.id);
           if (activeTaskToggle) {
@@ -443,6 +451,42 @@ export default function useAppData() {
             }),
           };
         });
+
+        // Filter out any task whose in-flight desired state contradicts the query's completion filter
+        if (parsed && parsed.completed !== undefined) {
+          reconciledRows = reconciledRows.filter(
+            (task) => task.completed === parsed.completed,
+          );
+        }
+
+        // Reconcile in-flight tasks that match this query's filters but were not yet returned by the server
+        if (parsed) {
+          const isSearch = Boolean(parsed.q && String(parsed.q).trim());
+          const isDefaultSort = !parsed.sort || parsed.sort === "newest";
+
+          if (!isSearch && isDefaultSort && parsed.completed !== undefined) {
+            for (const [, toggle] of taskToggleStateRef.current.entries()) {
+              if (toggle.desired === parsed.completed) {
+                const taskSnap = toggle.taskSnapshot;
+                if (!taskSnap) continue;
+                if (
+                  parsed.listId &&
+                  taskSnap.listId &&
+                  parsed.listId !== taskSnap.listId
+                ) {
+                  continue;
+                }
+                if (!reconciledRows.some((t) => t.id === taskSnap.id)) {
+                  const candidate = { ...taskSnap, completed: toggle.desired };
+                  const inserted = insertOrUpdateNewest(reconciledRows, candidate);
+                  if (inserted !== null) {
+                    reconciledRows = inserted;
+                  }
+                }
+              }
+            }
+          }
+        }
 
         // Update cache and display the fresh result.
         queryCacheRef.current.set(key, reconciledRows);
@@ -503,7 +547,7 @@ export default function useAppData() {
     }
   }
 
-  function reconcileTaskCompletion(updatedTask) {
+  function applyTaskCompletionToCaches(updatedTask) {
     const isCompleted = updatedTask.completed;
 
     for (const [key, cachedList] of queryCacheRef.current.entries()) {
@@ -622,8 +666,17 @@ export default function useAppData() {
       if (updatedForCurrent) {
         setTasks(updatedForCurrent);
       }
+    } else {
+      setTasks((prev) =>
+        prev.map((t) =>
+          t.id === updatedTask.id ? { ...t, ...updatedTask } : t,
+        ),
+      );
     }
+  }
 
+  function reconcileTaskCompletion(updatedTask) {
+    applyTaskCompletionToCaches(updatedTask);
     refreshTasks();
   }
 
@@ -697,6 +750,10 @@ export default function useAppData() {
       if (updatedForCurrent) {
         setTasks(updatedForCurrent);
       }
+    } else {
+      setTasks((prev) =>
+        prev.map((t) => (t.id === id ? { ...t, ...updated } : t)),
+      );
     }
 
     refreshTasks();
@@ -888,52 +945,56 @@ export default function useAppData() {
     const ts = taskToggleStateRef.current;
     const currentState = ts.get(id);
 
-    let currentCompleted;
-    if (currentState) {
-      currentCompleted = currentState.desired;
-    } else {
-      const task =
+    let taskSnapshot = currentState?.taskSnapshot;
+    let confirmedTask = currentState?.confirmedTask;
+
+    if (!taskSnapshot) {
+      taskSnapshot =
         displayedTasks.find((candidate) => candidate.id === id) ??
         tasksRef.current.find((candidate) => candidate.id === id) ??
         tasks.find((candidate) => candidate.id === id);
-      if (!task) return false;
-      currentCompleted = task.completed;
-    }
 
-    const newDesired = !currentCompleted;
-
-    // Optimistically update the visible state immediately.
-    setTasks((prev) =>
-      prev.map((t) => (t.id === id ? { ...t, completed: newDesired } : t)),
-    );
-
-    if (displayedQueryKeyRef.current) {
-      const curCached = queryCacheRef.current.get(displayedQueryKeyRef.current);
-      if (curCached) {
-        queryCacheRef.current.set(
-          displayedQueryKeyRef.current,
-          curCached.map((t) =>
-            t.id === id ? { ...t, completed: newDesired } : t,
-          ),
-        );
+      if (!taskSnapshot) {
+        for (const list of queryCacheRef.current.values()) {
+          const found = list.find((candidate) => candidate.id === id);
+          if (found) {
+            taskSnapshot = found;
+            break;
+          }
+        }
       }
+
+      if (!taskSnapshot) return false;
+      confirmedTask = taskSnapshot;
     }
+
+    const currentCompleted = currentState
+      ? currentState.desired
+      : taskSnapshot.completed;
+    const newDesired = !currentCompleted;
+    const optimisticTask = { ...taskSnapshot, completed: newDesired };
+
+    // 1. Immediately apply optimistic cache membership across all warm queries
+    applyTaskCompletionToCaches(optimisticTask);
 
     if (currentState?.inflight) {
-      ts.set(id, { ...currentState, desired: newDesired });
+      ts.set(id, {
+        ...currentState,
+        desired: newDesired,
+        taskSnapshot: optimisticTask,
+      });
       return true;
     }
 
-    const task =
-      displayedTasks.find((candidate) => candidate.id === id) ??
-      tasksRef.current.find((candidate) => candidate.id === id);
     const confirmedCompleted =
-      currentState?.confirmed ?? task?.completed ?? currentCompleted;
+      currentState?.confirmed ?? confirmedTask?.completed ?? currentCompleted;
 
     ts.set(id, {
       desired: newDesired,
       confirmed: confirmedCompleted,
       inflight: true,
+      confirmedTask,
+      taskSnapshot: optimisticTask,
     });
 
     const loopPromise = (async () => {
@@ -956,38 +1017,30 @@ export default function useAppData() {
           const latest = ts.get(id);
           if (!latest) break;
 
-          ts.set(id, { ...latest, confirmed: updated.completed });
+          ts.set(id, {
+            ...latest,
+            confirmed: updated.completed,
+            confirmedTask: updated,
+            taskSnapshot: { ...latest.taskSnapshot, ...updated },
+          });
 
           if (latest.desired === updated.completed) {
-            setTasks((prev) =>
-              prev.map((t) => (t.id === id ? { ...t, ...updated } : t)),
-            );
+            applyTaskCompletionToCaches(updated);
           }
         } catch (cause) {
           const latest = ts.get(id);
           const restoreCompleted = latest?.confirmed ?? confirmedCompleted;
+          const restoreTask = latest?.confirmedTask ?? confirmedTask;
+          const restoredTask = {
+            ...restoreTask,
+            completed: restoreCompleted,
+          };
 
-          setTasks((prev) =>
-            prev.map((t) =>
-              t.id === id ? { ...t, completed: restoreCompleted } : t,
-            ),
-          );
-          if (displayedQueryKeyRef.current) {
-            const curCached = queryCacheRef.current.get(
-              displayedQueryKeyRef.current,
-            );
-            if (curCached) {
-              queryCacheRef.current.set(
-                displayedQueryKeyRef.current,
-                curCached.map((t) =>
-                  t.id === id ? { ...t, completed: restoreCompleted } : t,
-                ),
-              );
-            }
-          }
+          applyTaskCompletionToCaches(restoredTask);
           setActionError(userMessageFor(cause));
           ts.delete(id);
           succeeded = false;
+          refreshTasks();
           break;
         }
 
@@ -1005,7 +1058,8 @@ export default function useAppData() {
       }
 
       if (succeeded && lastUpdatedTask) {
-        reconcileTaskCompletion(lastUpdatedTask);
+        applyTaskCompletionToCaches(lastUpdatedTask);
+        refreshTasks();
       }
 
       return succeeded;
