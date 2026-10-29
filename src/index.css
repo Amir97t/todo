@@ -378,7 +378,7 @@ a {
 @keyframes islandIn {
   from {
     opacity: 0;
-    transform: translateY(-16px) scale(0.92);
+    transform: translateY(-8px) scale(0.96);
   }
 
   to {
@@ -395,7 +395,7 @@ a {
 
   to {
     opacity: 0;
-    transform: translateY(-16px) scale(0.92);
+    transform: translateY(-8px) scale(0.96);
   }
 }
 
@@ -491,7 +491,7 @@ a {
 
 .checklist-text.is-done::after {
   animation:
-    pencilDraw 0.42s cubic-bezier(0.22, 1, 0.36, 1)
+    pencilDraw 0.18s cubic-bezier(0.22, 1, 0.36, 1)
     forwards;
 }
 

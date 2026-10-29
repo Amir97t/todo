@@ -38,18 +38,29 @@ export default function Completed({
   const isSearching = search.trim().length > 0;
 
   // Completed is always global: no listId is ever sent from this page.
-  // Debounced search query to reduce request volume while keeping the input
-  // immediately responsive. The local state updates on every keystroke; the
-  // server query is published after a short pause. Clearing the search
-  // updates promptly because the timeout is cleared on value change.
+  // Publish the query immediately when non-search parameters change (sort).
+  // Only the search text itself is debounced; clearing search publishes right away.
   const debounceRef = useRef(null);
+  const prevFilterRef = useRef(filter);
+
   useEffect(() => {
+    const filterChanged = prevFilterRef.current !== filter;
+    prevFilterRef.current = filter;
+
     if (debounceRef.current) {
       clearTimeout(debounceRef.current);
     }
-    debounceRef.current = setTimeout(() => {
+
+    const publish = () =>
       setTaskQuery(buildTaskQuery({ completed: true, q: search, sort: filter }));
-    }, SEARCH_DEBOUNCE_MS);
+
+    // Publish immediately for filter changes or when search is cleared.
+    if (filterChanged || search === "") {
+      publish();
+    } else {
+      debounceRef.current = setTimeout(publish, SEARCH_DEBOUNCE_MS);
+    }
+
     return () => {
       if (debounceRef.current) {
         clearTimeout(debounceRef.current);

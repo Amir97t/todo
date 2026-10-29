@@ -214,7 +214,7 @@ export default function TaskChecklist({
                           aria-hidden="true"
                           className="ml-1 inline-flex align-middle"
                           style={{
-                            animation: "pencilWiggle 0.35s ease",
+                            animation: "pencilWiggle 0.2s ease",
                             color: "var(--text-faint)",
                           }}
                         >

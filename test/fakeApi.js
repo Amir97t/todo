@@ -159,8 +159,64 @@ export const fakeApi = {
         );
       }
 
-      const direction = query.sort === "oldest" || query.sort === "az" ? 1 : -1;
-      rows.sort((a, b) => (a.createdAt < b.createdAt ? direction : -direction));
+      function normalizeTime(val) {
+        if (typeof val === "number") return Number.isFinite(val) ? val : 0;
+        if (!val) return 0;
+        const parsed = Date.parse(val);
+        return Number.isNaN(parsed) ? 0 : parsed;
+      }
+
+      function compareIds(aId, bId) {
+        if (aId === bId) return 0;
+        if (typeof aId === "number" && typeof bId === "number") {
+          return aId < bId ? -1 : 1;
+        }
+        const aStr = String(aId ?? "");
+        const bStr = String(bId ?? "");
+        if (aStr === bStr) return 0;
+        return aStr < bStr ? -1 : 1;
+      }
+
+      const sortMode = query.sort || "newest";
+
+      rows.sort((a, b) => {
+        if (sortMode === "az" || sortMode === "za") {
+          const aTitle = String(a.title ?? "").toLowerCase();
+          const bTitle = String(b.title ?? "").toLowerCase();
+          if (aTitle !== bTitle) {
+            if (sortMode === "az") {
+              return aTitle < bTitle ? -1 : 1;
+            }
+            return aTitle < bTitle ? 1 : -1;
+          }
+          // Tie-breakers: createdAt ASC, then id ASC
+          const aTime = normalizeTime(a.createdAt);
+          const bTime = normalizeTime(b.createdAt);
+          if (aTime !== bTime) {
+            return aTime < bTime ? -1 : 1;
+          }
+          return compareIds(a.id, b.id);
+        }
+
+        if (sortMode === "oldest") {
+          // oldest: createdAt ASC, then id ASC
+          const aTime = normalizeTime(a.createdAt);
+          const bTime = normalizeTime(b.createdAt);
+          if (aTime !== bTime) {
+            return aTime < bTime ? -1 : 1;
+          }
+          return compareIds(a.id, b.id);
+        }
+
+        // newest (and default): createdAt DESC, then id DESC
+        const aTime = normalizeTime(a.createdAt);
+        const bTime = normalizeTime(b.createdAt);
+        if (aTime !== bTime) {
+          return aTime < bTime ? 1 : -1;
+        }
+        const idComp = compareIds(a.id, b.id);
+        return idComp === 0 ? 0 : idComp < 0 ? 1 : -1;
+      });
 
       return rows.map(withChecklist);
     },

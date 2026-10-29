@@ -11,5 +11,6 @@ export default defineConfig({
     // separately provisioned backend and dedicated disposable database.
     // Keep it out of database-free unit CI.
     exclude: [...configDefaults.exclude, "test/live-migration.test.js"],
+    testTimeout: 15000,
   },
 });

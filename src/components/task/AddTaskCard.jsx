@@ -122,7 +122,7 @@ function AddTaskDialog({ open, onClose, onAddTask, pending = false }) {
         className="relative w-full max-w-130 overflow-hidden rounded-[20px] border bg-(--bg-elevated) shadow-[0_24px_64px_rgba(0,0,0,0.22),0_4px_16px_rgba(0,0,0,0.12)]"
         style={{
           borderColor: "var(--border)",
-          animation: "islandIn 0.34s cubic-bezier(0.16,1,0.3,1) both",
+          animation: "islandIn 0.22s cubic-bezier(0.16,1,0.3,1) both",
         }}
       >
         <div className="flex justify-center pt-2.5">
